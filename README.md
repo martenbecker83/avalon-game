@@ -34,7 +34,7 @@ Je kiest zelf welke wereld je speelt, maar je blijft in die wereld tot je hem he
 ## Besturing
 
 - **Laptop:** pijltjes of A/D lopen, spatie of pijl omhoog springen, X of J aanvallen, Esc pauze
-- **iPad:** joystick links om te lopen (omhoog duwen is springen), knoppen rechts om aan te vallen en te springen (speel met het scherm liggend). Zet de game via Delen > Zet op beginscherm als app op je iPad.
+- **iPad:** schuifknop links om te lopen, knoppen rechts om aan te vallen en te springen (speel met het scherm liggend). Zet de game via Delen > Zet op beginscherm als app op je iPad.
 - In de Lucht-wereld kun je dubbel springen, onderwater kun je zwemmen door steeds op springen te drukken.
 
 ## Scores

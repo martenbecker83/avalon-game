@@ -60,20 +60,16 @@ export function initInput(onPause) {
   const knob = document.getElementById('stick-knob');
   let stickId = null, stickCx = 0;
   let stickCy = 0;
-  // knop naar links/rechts = lopen, knop omhoog duwen = springen
-  const stickMove = (x, y) => {
+  // knop naar links/rechts schuiven = lopen
+  const stickMove = (x) => {
     const max = stick.clientWidth * 0.3;
-    let dx = x - stickCx, dy = y - stickCy;
-    const len = Math.hypot(dx, dy);
-    if (len > max) { dx = dx / len * max; dy = dy / len * max; }
-    knob.style.transform = `translate(${dx}px, ${dy}px)`;
-    const dead = max * 0.25;
+    const dx = Math.max(-max, Math.min(max, x - stickCx));
+    knob.style.transform = `translate(${dx}px, 0)`;
+    const dead = max * 0.22;
     if (keys.left !== dx < -dead) set('left', dx < -dead);
     if (keys.right !== dx > dead) set('right', dx > dead);
-    const up = dy < -max * 0.5;
-    if (up !== stickJump) { stickJump = up; refresh(); }
   };
-  const stickEnd = () => { stickId = null; knob.style.transform = ''; set('left', false); set('right', false); stickJump = false; refresh(); stick.classList.remove('on'); };
+  const stickEnd = () => { stickId = null; knob.style.transform = ''; set('left', false); set('right', false); stick.classList.remove('on'); };
   const inStick = (x, y) => {
     const r = stick.getBoundingClientRect(); const pad = 70;
     return x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad;
