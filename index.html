@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#3aa7e8">
+<title>Avalon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='28' fill='%2342c94a' stroke='%23157a2c' stroke-width='5'/><text x='32' y='44' font-size='34' font-family='Arial' font-weight='bold' text-anchor='middle' fill='white'>A</text></svg>">
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div class="hud-left">
+    <div id="hud-hearts"></div>
+    <div id="hud-coins"><span class="coin-ico"></span><span id="hud-coin-count">0</span></div>
+  </div>
+  <div id="hud-level"></div>
+  <button id="btn-pause" class="round-btn" aria-label="Pauze">❚❚</button>
+</div>
+<div id="boss-bar" class="hidden"><div id="boss-name"></div><div class="bar"><div id="boss-fill"></div></div></div>
+<div id="banner" class="hidden"></div>
+
+<!-- Touch controls -->
+<div id="touch" class="hidden">
+  <div class="pad-left">
+    <button class="tbtn" data-k="left" aria-label="Links">◀</button>
+    <button class="tbtn" data-k="right" aria-label="Rechts">▶</button>
+  </div>
+  <div class="pad-right">
+    <button class="tbtn tbtn-atk" data-k="attack" aria-label="Aanvallen">⚔</button>
+    <button class="tbtn tbtn-jump" data-k="jump" aria-label="Springen">⤒</button>
+  </div>
+</div>
+
+<!-- Screens -->
+<div id="screens">
+
+  <section id="scr-title" class="screen">
+    <div class="title-wrap">
+      <h1 class="logo">AVALON</h1>
+      <p class="tagline">Red de mensen in vier werelden!</p>
+      <div class="menu">
+        <button class="big-btn" id="btn-play">Spelen</button>
+        <button class="big-btn alt" id="btn-scores">Scorebord</button>
+        <button class="big-btn alt small" id="btn-sound">🔊 Geluid aan</button>
+      </div>
+      <p class="help desktop-only">Laptop: ← → lopen · spatie springen · X of J aanvallen · Esc pauze</p>
+    </div>
+  </section>
+
+  <section id="scr-chars" class="screen hidden">
+    <header class="scr-head">
+      <button class="round-btn back" data-back="title" aria-label="Terug">←</button>
+      <h2>Kies je personage</h2>
+    </header>
+    <div id="char-grid" class="char-grid"></div>
+    <div class="char-detail" id="char-detail"></div>
+  </section>
+
+  <section id="scr-worlds" class="screen hidden">
+    <header class="scr-head">
+      <button class="round-btn back" data-back="chars" aria-label="Terug">←</button>
+      <h2>Kies een wereld</h2>
+    </header>
+    <div id="world-grid" class="world-grid"></div>
+  </section>
+
+  <section id="scr-scores" class="screen hidden">
+    <header class="scr-head">
+      <button class="round-btn back" data-back="title" aria-label="Terug">←</button>
+      <h2>Scorebord</h2>
+    </header>
+    <div class="tabs">
+      <button class="tab active" data-tab="global">Iedereen</button>
+      <button class="tab" data-tab="local">Op dit apparaat</button>
+    </div>
+    <div id="score-list" class="score-list"></div>
+  </section>
+
+</div>
+
+<!-- Modal -->
+<div id="modal" class="hidden"><div class="modal-card" id="modal-card"></div></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

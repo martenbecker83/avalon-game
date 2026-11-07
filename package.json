@@ -1,0 +1,10 @@
+{
+  "name": "avalon-game",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Avalon: een familie-platformgame voor iPad en laptop",
+  "type": "module",
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  }
+}

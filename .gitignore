@@ -1,0 +1,4 @@
+node_modules/
+.netlify/
+_chartest.html
+.DS_Store
