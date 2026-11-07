@@ -4,7 +4,7 @@ import { WORLDS, LEVELS_PER_WORLD, GROUND_Y } from './worlds.js';
 import { drawWorldPreview, drawBackground, drawGround } from './art.js';
 import { Game } from './game.js';
 import { initInput, isTouch, clearPressed } from './input.js';
-import { initAudio, setSound, sfx, playMusic, stopMusic } from './audio.js';
+import { initAudio, setMusic, setSfx, sfx, playMusic, stopMusic } from './audio.js';
 import * as store from './storage.js';
 
 const $ = (s) => document.querySelector(s);
@@ -12,14 +12,16 @@ const canvas = $('#game');
 const settings = store.getSettings();
 let selectedChar = charById(settings.character);
 let currentWorld = null;
+let runChar = selectedChar; // het personage van het lopende spel (kan niet wisselen tijdens een spel)
 let mode = 'menu'; // menu | play
 
-setSound(settings.sound);
+setMusic(settings.music); setSfx(settings.sfx);
 
 // ---------- game hooks ----------
 let bannerTimer = null;
 const game = new Game(canvas, {
-  onHud({ hearts, max, coins, label }) {
+  onHud({ hearts, max, lives, coins, label }) {
+    $('#hud-life-count').textContent = `×${lives}`;
     $('#hud-hearts').innerHTML = Array.from({ length: max }, (_, i) => `<svg class="h ${i < hearts ? '' : 'empty'}" viewBox="0 0 32 30"><path d="M16 28C4 19 1 13 1 8.5 1 4.4 4.3 1 8.5 1c3 0 5.6 1.8 7.5 4.6C17.9 2.8 20.5 1 23.5 1 27.7 1 31 4.4 31 8.5 31 13 28 19 16 28z"/></svg>`).join('');
     $('#hud-coin-count').textContent = coins;
     $('#hud-level').textContent = label;
@@ -36,24 +38,29 @@ const game = new Game(canvas, {
     if (!name) { bar.classList.add('hidden'); return; }
     bar.classList.remove('hidden'); $('#boss-name').textContent = name; $('#boss-fill').style.width = `${Math.round(frac * 100)}%`;
   },
-  onCheckpoint({ level, checkpoint, coins }) { saveProgress({ level, checkpoint, coins }); },
-  onLevelComplete({ level, coins }) {
+  onCheckpoint({ level, checkpoint, coins, lives }) { saveProgress({ level, checkpoint, coins, lives }); },
+  onLifeLost({ level, checkpoint, coins, lives }) { saveProgress({ level, checkpoint, coins, lives }); },
+  onLevelComplete({ level, coins, lives }) {
     const next = level + 1;
-    saveProgress({ level: next, checkpoint: 0, coins });
-    startLevel(next, 0, coins);
+    saveProgress({ level: next, checkpoint: 0, coins, lives });
+    startLevel(next, 0, coins, lives); // nieuw level: hartjes weer vol
+  },
+  onGameOver({ coins }) {
+    store.clearProgress(currentWorld.id); // na game over begin je weer bij 0
+    showScoreEntry(coins, 'gameover');
   },
   onWorldComplete({ coins }) {
     const prog = store.getProgress(currentWorld.id) || {};
-    store.setProgress(currentWorld.id, { level: 1, checkpoint: 0, coins: 0, active: false, freed: true, best: Math.max(prog.best || 0, coins) });
-    showScoreEntry(coins, true);
+    store.setProgress(currentWorld.id, { level: 1, checkpoint: 0, coins: 0, lives: 3, active: false, freed: true, best: Math.max(prog.best || 0, coins) });
+    showScoreEntry(coins, 'won');
   },
 });
 
 function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
-function saveProgress({ level, checkpoint, coins }) {
+function saveProgress({ level, checkpoint, coins, lives }) {
   const old = store.getProgress(currentWorld.id) || {};
-  store.setProgress(currentWorld.id, { ...old, level, checkpoint, coins, active: true });
+  store.setProgress(currentWorld.id, { ...old, level, checkpoint, coins, lives: lives ?? old.lives ?? 3, char: runChar.id, active: true });
 }
 
 // ---------- screens ----------
@@ -68,12 +75,21 @@ function hideScreens() { document.querySelectorAll('.screen').forEach((s) => s.c
 document.querySelectorAll('[data-back]').forEach((b) => b.addEventListener('click', () => { sfx.click(); show(b.dataset.back); }));
 $('#btn-play').addEventListener('click', () => { initAudio(); playMusic('title'); sfx.click(); show('chars'); });
 $('#btn-scores').addEventListener('click', () => { initAudio(); sfx.click(); show('scores'); });
-const soundBtn = $('#btn-sound');
-const paintSound = () => { soundBtn.textContent = settings.sound ? '🔊 Geluid aan' : '🔇 Geluid uit'; };
+const musicBtn = $('#btn-music'), sfxBtn = $('#btn-sfx');
+const paintSound = () => {
+  musicBtn.textContent = settings.music ? '🎵 Muziek aan' : '🎵 Muziek uit';
+  sfxBtn.textContent = settings.sfx ? '🔊 Effecten aan' : '🔇 Effecten uit';
+  musicBtn.classList.toggle('off', !settings.music); sfxBtn.classList.toggle('off', !settings.sfx);
+};
 paintSound();
-soundBtn.addEventListener('click', () => {
-  initAudio(); settings.sound = !settings.sound; setSound(settings.sound); store.setSettings({ sound: settings.sound }); paintSound();
-  if (settings.sound) { playMusic('title'); sfx.click(); }
+musicBtn.addEventListener('click', () => {
+  initAudio(); settings.music = !settings.music; setMusic(settings.music); store.setSettings({ music: settings.music }); paintSound();
+  if (settings.music) playMusic('title');
+  sfx.click();
+});
+sfxBtn.addEventListener('click', () => {
+  initAudio(); settings.sfx = !settings.sfx; setSfx(settings.sfx); store.setSettings({ sfx: settings.sfx }); paintSound();
+  sfx.click();
 });
 
 // characters
@@ -123,8 +139,9 @@ function buildWorlds() {
     const card = document.createElement('button');
     card.className = 'card world-card';
     const lvl = prog?.active ? prog.level : 0;
-    const dots = Array.from({ length: LEVELS_PER_WORLD }, (_, i) => `<i class="${i + 1 < lvl || (prog?.freed && !prog?.active) ? 'done' : ''} ${i === LEVELS_PER_WORLD - 1 ? 'boss' : ''}"></i>`).join('');
-    const status = prog?.active ? `Bezig: level ${prog.level}${prog.checkpoint ? `, checkpoint ${prog.checkpoint}` : ''} · ${prog.coins} munten` : (prog?.freed ? 'Uitgespeeld! Speel nog eens voor een hogere score' : w.blurb);
+    const dots = Array.from({ length: LEVELS_PER_WORLD }, (_, i) => `<i class="${i + 1 < lvl ? 'done' : ''} ${i === LEVELS_PER_WORLD - 1 ? 'boss' : ''}"></i>`).join('');
+    const pc = prog?.char ? charById(prog.char).name : '';
+    const status = prog?.active ? `Bezig met ${pc}: level ${prog.level} · ${prog.coins} munten · ${prog.lives ?? 3} ${(prog.lives ?? 3) === 1 ? 'leven' : 'levens'}` : (prog?.freed ? 'Uitgespeeld! Speel nog eens voor een hogere score' : w.blurb);
     card.innerHTML = `<canvas></canvas>${prog?.freed ? '<span class="w-badge">★ Mensen bevrijd</span>' : ''}<div class="w-info"><div class="w-name">${w.name}</div><div class="w-prog">${status}</div><div class="dots">${dots}</div></div>`;
     card.addEventListener('click', () => { sfx.click(); chooseWorld(idx); });
     grid.appendChild(card);
@@ -136,32 +153,38 @@ function chooseWorld(idx) {
   currentWorld = WORLDS[idx];
   const prog = store.getProgress(currentWorld.id);
   if (prog?.active && (prog.level > 1 || prog.checkpoint > 0 || prog.coins > 0)) {
+    const pc = charById(prog.char || selectedChar.id);
+    const lives = prog.lives ?? 3;
     modal(`
       <h2>${currentWorld.name}</h2>
-      <p>Je was bij <b>level ${prog.level}</b>${prog.checkpoint ? `, checkpoint ${prog.checkpoint}` : ''} met <b>${prog.coins} munten</b>.</p>
+      <canvas class="modal-portrait" id="mp"></canvas>
+      <p>Je was met <b>${pc.name}</b> bij <b>level ${prog.level}</b>${prog.checkpoint ? `, checkpoint ${prog.checkpoint}` : ''}, met <b>${prog.coins} munten</b> en <b>${lives} ${lives === 1 ? 'leven' : 'levens'}</b>.</p>
       <div class="menu">
-        <button class="big-btn" data-act="continue">Verder spelen</button>
-        <button class="big-btn alt" data-act="restart">Opnieuw beginnen</button>
+        <button class="big-btn" data-act="continue">Verder spelen met ${pc.name}</button>
+        <button class="big-btn alt" data-act="restart">Opnieuw beginnen met ${selectedChar.name}</button>
         <button class="big-btn alt small" data-act="cancel">Terug</button>
       </div>`, (act) => {
-      if (act === 'continue') { closeModal(); startLevel(prog.level, prog.checkpoint, prog.coins); }
-      if (act === 'restart') { closeModal(); store.clearProgress(currentWorld.id); saveProgress({ level: 1, checkpoint: 0, coins: 0 }); startLevel(1, 0, 0); }
+      if (act === 'continue') { closeModal(); runChar = pc; startLevel(prog.level, prog.checkpoint, prog.coins, lives); }
+      if (act === 'restart') { closeModal(); store.clearProgress(currentWorld.id); runChar = selectedChar; saveProgress({ level: 1, checkpoint: 0, coins: 0, lives: 3 }); startLevel(1, 0, 0, 3); }
       if (act === 'cancel') closeModal();
     });
+    const mp = $('#mp'); if (mp) renderPortrait(mp, pc, { w: 110, h: 110 });
   } else {
-    saveProgress({ level: 1, checkpoint: 0, coins: 0 });
-    startLevel(1, 0, 0);
+    runChar = selectedChar;
+    saveProgress({ level: 1, checkpoint: 0, coins: 0, lives: 3 });
+    startLevel(1, 0, 0, 3);
   }
 }
 
-function startLevel(level, checkpoint, coins) {
+function startLevel(level, checkpoint, coins, lives = 3) {
   initAudio();
   mode = 'play';
   hideScreens();
   $('#hud').classList.remove('hidden');
   $('#touch').classList.toggle('hidden', !isTouch());
   clearPressed();
-  game.start({ worldIdx: WORLDS.indexOf(currentWorld), level, checkpoint, coins, char: selectedChar });
+  renderHead($('#hud-life-ico'), runChar, 30);
+  game.start({ worldIdx: WORLDS.indexOf(currentWorld), level, checkpoint, coins, lives, char: runChar });
 }
 
 function leaveGame() {
@@ -192,8 +215,8 @@ function pause() {
         if (a2 === 'yes') {
           const c = game.coinsAtCp;
           const prog = store.getProgress(currentWorld.id) || {};
-          store.setProgress(currentWorld.id, { level: 1, checkpoint: 0, coins: 0, active: false, freed: !!prog.freed });
-          leaveGame(); showScoreEntry(c, false);
+          store.setProgress(currentWorld.id, { level: 1, checkpoint: 0, coins: 0, lives: 3, active: false, freed: !!prog.freed });
+          leaveGame(); showScoreEntry(c, 'stop');
         }
       });
     }
@@ -217,18 +240,18 @@ $('#modal').addEventListener('click', (e) => {
 });
 
 // ---------- score entry ----------
-function showScoreEntry(score, won) {
+function showScoreEntry(score, kind) {
   leaveGame();
-  if (won) playMusic('title');
+  const won = kind === 'won', over = kind === 'gameover';
+  const after = () => show(over ? 'chars' : 'worlds');
   let ini = (settings.initials || '').slice(0, 3).split('');
   const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
   const render = () => {
     const boxes = [0, 1, 2].map((i) => `<div class="ini-box ${i === ini.length ? 'active' : ''}">${ini[i] || ''}</div>`).join('');
     modal(`
-      <h2>${won ? 'Gewonnen!' : 'Score registreren'}</h2>
-      ${won ? `<p>Je hebt de mensen in <b>${currentWorld.name}</b> bevrijd met ${selectedChar.name}!</p>` : `<p>${currentWorld.name} met ${selectedChar.name}</p>`}
-      <canvas class="modal-portrait" id="mp"></canvas>
-      <div class="big-score">${score}</div><p>munten</p>
+      <h2>${won ? 'Gewonnen!' : over ? 'Game over' : 'Score registreren'}</h2>
+      ${won ? `<p>Je hebt de mensen in <b>${currentWorld.name}</b> bevrijd met ${runChar.name}!</p>` : over ? `<p>Je levens zijn op. ${currentWorld.name} begint weer bij level 1.</p>` : `<p>${currentWorld.name} met ${runChar.name}</p>`}
+      <div class="score-head"><canvas class="modal-portrait small" id="mp"></canvas><div><div class="big-score">${score}</div><p>munten</p></div></div>
       <p style="margin-bottom:4px">Typ je initialen:</p>
       <div class="ini-boxes">${boxes}</div>
       <div class="keyboard">${letters.map((l) => `<button data-act="k" data-l="${l}">${l}</button>`).join('')}<button class="wide" data-act="del">⌫ Wis</button></div>
@@ -236,23 +259,23 @@ function showScoreEntry(score, won) {
     `, async (act, btn) => {
       if (act === 'k' && ini.length < 3) { ini.push(btn.dataset.l); render(); }
       if (act === 'del') { ini.pop(); render(); }
-      if (act === 'skip') { closeModal(); show('worlds'); }
+      if (act === 'skip') { closeModal(); after(); }
       if (act === 'save' && ini.length) {
         const initials = ini.join('');
         settings.initials = initials; store.setSettings({ initials });
-        const entry = { initials, character: selectedChar.id, world: currentWorld.id, score, date: new Date().toISOString().slice(0, 10) };
+        const entry = { initials, character: runChar.id, world: currentWorld.id, score, date: new Date().toISOString().slice(0, 10) };
         store.addLocalScore(entry);
         $('#modal-card').innerHTML = '<h2>Opslaan…</h2>';
         let ok = true;
         try { await store.postGlobalScore(entry); } catch { ok = false; }
         modal(`<h2>${ok ? 'Opgeslagen!' : 'Bijna gelukt'}</h2><p>${ok ? 'Je score staat op het scorebord.' : 'Het algemene scorebord is nu niet bereikbaar. Je score is wel op dit apparaat bewaard.'}</p>
-          <div class="menu"><button class="big-btn" data-act="board">Bekijk scorebord</button><button class="big-btn alt" data-act="again">Verder spelen</button></div>`, (a) => {
+          <div class="menu"><button class="big-btn" data-act="board">Bekijk scorebord</button><button class="big-btn alt" data-act="again">${over ? 'Kies een personage' : 'Verder spelen'}</button></div>`, (a) => {
           closeModal();
-          if (a === 'board') show('scores'); else show('worlds');
+          if (a === 'board') show('scores'); else after();
         });
       }
     });
-    const mp = $('#mp'); if (mp) renderPortrait(mp, selectedChar, { w: 110, h: 110 });
+    const mp = $('#mp'); if (mp) renderPortrait(mp, runChar, { w: 80, h: 80 });
   };
   render();
   const onKey = (e) => {
@@ -287,16 +310,20 @@ async function buildScores(tab) {
     const row = document.createElement('div');
     row.className = `score-row ${i < 3 ? 'top' + (i + 1) : ''}`;
     row.innerHTML = `<span class="rank">${i + 1}</span><span class="ini">${esc(r.initials)}</span>
-      <span class="who"><canvas></canvas><span>${c.name}<small>${w ? w.name : ''}${r.date ? ' · ' + esc(r.date) : ''}</small></span></span>
+      <span class="who"><canvas title="${c.name}"></canvas><span>${w ? w.name : ''}<small>${esc(fmtDate(r.date))}</small></span></span>
       <span class="pts">${r.score}</span>`;
     list.appendChild(row);
     renderHead(row.querySelector('canvas'), c);
   });
 }
-function renderHead(cv, def) {
+function fmtDate(d) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d || '');
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : (d || '');
+}
+function renderHead(cv, def, size = 40) {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  cv.width = 40 * dpr; cv.height = 40 * dpr;
-  const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  cv.width = size * dpr; cv.height = size * dpr;
+  const ctx = cv.getContext('2d'); ctx.setTransform(dpr * size / 40, 0, 0, dpr * size / 40, 0, 0);
   ctx.save();
   if (def.kind === 'cat') { ctx.translate(-8, 82); ctx.scale(1.6, 1.6); }
   else { const k = 155 / def.height; ctx.translate(20, 28 + def.height * 0.86 * k * 0.6); ctx.scale(k * 0.6, k * 0.6); }
@@ -364,4 +391,4 @@ checkRotate();
 window.addEventListener('pointerdown', () => { initAudio(); if (mode === 'menu') playMusic('title'); }, { once: true });
 
 // debug helpers (only via URL ?debug)
-if (location.search.includes('debug')) window.__avalon = { game, startLevel, WORLDS, setWorld: (i) => (currentWorld = WORLDS[i]), setChar: (id) => (selectedChar = charById(id)) };
+if (location.search.includes('debug')) window.__avalon = { game, startLevel, WORLDS, setWorld: (i) => (currentWorld = WORLDS[i]), setChar: (id) => (runChar = selectedChar = charById(id)) };

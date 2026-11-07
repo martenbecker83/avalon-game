@@ -4,10 +4,10 @@ export const CHARACTERS = [
   {
     id: 'avalon', name: 'Avalon', weapon: 'Zwaard', kind: 'human', height: 72,
     power: 'Zwaardslag',
-    desc: 'Snelle slagen dichtbij met haar zwaard. Doet de meeste schade van iedereen.',
-    stats: { kracht: 5, bereik: 2, snelheid: 4 },
+    desc: 'Snelle slagen dichtbij met haar zwaard. Avalon is supersnel en hakt flink door.',
+    stats: { kracht: 3, bereik: 2, snelheid: 5 },
     attack: { type: 'sword', cd: 0.30, dmg: 2 },
-    speed: 310, jump: 770,
+    speed: 355, jump: 790,
     look: {
       skin: '#f1c7a6', skinShade: '#d9a383', cheek: '#f39a8f',
       hair: '#1f1612', hairHi: '#4a3528', hairStyle: 'bob',
@@ -19,10 +19,10 @@ export const CHARACTERS = [
   {
     id: 'papa', name: 'Papa', weapon: 'Bierflesjes', kind: 'human', height: 88,
     power: 'Flessenworp',
-    desc: 'Gooit bierflesjes in een boogje. Ideaal om over obstakels heen te mikken. Ploep: schuim op iedereen in de buurt!',
-    stats: { kracht: 3, bereik: 4, snelheid: 3 },
+    desc: 'Gooit bierflesjes in een boogje, ver en over obstakels heen. Ploep: schuim op iedereen in de buurt! Goed in alles.',
+    stats: { kracht: 3, bereik: 4, snelheid: 4 },
     attack: { type: 'bottle', cd: 0.40, dmg: 1 },
-    speed: 300, jump: 760,
+    speed: 320, jump: 770,
     look: {
       skin: '#f0c4a3', skinShade: '#d39d7c', cheek: '#ee9a86', stubble: true,
       hair: '#6a4328', hairHi: '#9a6a43', hairStyle: 'swept',
@@ -34,10 +34,10 @@ export const CHARACTERS = [
   {
     id: 'mama', name: 'Mama', weapon: 'Microfoon', kind: 'human', height: 84,
     power: 'Schreeuwgolf',
-    desc: 'Schreeuwt in haar microfoon. De geluidsgolf gaat dwars door ALLE vijanden heen. Moet even opladen.',
-    stats: { kracht: 4, bereik: 5, snelheid: 2 },
+    desc: 'Schreeuwt in haar microfoon. De geluidsgolf gaat dwars door ALLE vijanden heen. Goed in alles.',
+    stats: { kracht: 4, bereik: 4, snelheid: 4 },
     attack: { type: 'mic', cd: 0.90, dmg: 2 },
-    speed: 300, jump: 760,
+    speed: 320, jump: 770,
     look: {
       skin: '#d9a77f', skinShade: '#bb855e', cheek: '#e38e7a',
       hair: '#1d1411', hairHi: '#4a3226', hairStyle: 'long',
@@ -49,19 +49,19 @@ export const CHARACTERS = [
   {
     id: 'fuchi', name: 'Fu-Chi', weapon: 'Klauwen', kind: 'cat', height: 48,
     power: 'Klauwenstorm',
-    desc: 'Supersnel krabben met haar klauwen. Fu-Chi is de snelste en springt het hoogst van iedereen.',
+    desc: 'Supersnel krabben met haar klauwen. Fu-Chi is net zo snel als Avalon en springt het hoogst van iedereen.',
     stats: { kracht: 2, bereik: 1, snelheid: 5 },
     attack: { type: 'claws', cd: 0.15, dmg: 1 },
-    speed: 350, jump: 880,
+    speed: 360, jump: 880,
     look: { fur: '#efe3d2', furShade: '#cdbba4', point: '#4a2f22', pointHi: '#6e4a36', eye: '#6fb8d8', white: '#ffffff' },
   },
   {
     id: 'oma', name: 'Oma', weapon: 'Appeltaart', kind: 'human', height: 80,
     power: 'Taart-in-je-gezicht',
-    desc: 'Gooit appeltaart recht in het gezicht. De vijand ziet even niks en staat stil!',
-    stats: { kracht: 2, bereik: 4, snelheid: 3 },
-    attack: { type: 'pie', cd: 0.45, dmg: 1 },
-    speed: 295, jump: 750,
+    desc: 'Duwt een appeltaart vol in het gezicht van vijanden dichtbij. Hard raak, en de vijand ziet even niks!',
+    stats: { kracht: 4, bereik: 2, snelheid: 2 },
+    attack: { type: 'pie', cd: 0.5, dmg: 2 },
+    speed: 255, jump: 745,
     look: {
       skin: '#f3cdb3', skinShade: '#d9aa8d', cheek: '#ef9e93', freckles: true,
       hair: '#efe8d8', hairHi: '#ffffff', hairStyle: 'pixie',
@@ -71,12 +71,12 @@ export const CHARACTERS = [
     },
   },
   {
-    id: 'opa', name: 'Opa', weapon: 'Moersleutels', kind: 'human', height: 90,
+    id: 'opa', name: 'Opa', weapon: 'Moersleutel', kind: 'human', height: 90,
     power: 'Sleutelsmijter',
-    desc: 'Smijt draaiende moersleutels supersnel recht vooruit. Haalt vijanden van heel ver weg.',
-    stats: { kracht: 3, bereik: 5, snelheid: 3 },
-    attack: { type: 'wrench', cd: 0.30, dmg: 1 },
-    speed: 295, jump: 750,
+    desc: 'Smijt met zijn grote moersleutel. Komt niet ver, maar als hij raakt, dan raakt hij hard!',
+    stats: { kracht: 5, bereik: 2, snelheid: 2 },
+    attack: { type: 'wrench', cd: 0.45, dmg: 3 },
+    speed: 255, jump: 740,
     look: {
       skin: '#f0c9ad', skinShade: '#d4a184', cheek: '#ec9c8c',
       hair: '#f4f4f0', hairHi: '#ffffff', hairStyle: 'thinwhite',
@@ -88,10 +88,10 @@ export const CHARACTERS = [
   {
     id: 'lolo', name: 'Lolo', weapon: 'Hamer', kind: 'human', height: 82,
     power: 'Hamerdreun',
-    desc: 'Slaat met zijn hamer op de grond. De klap raakt alle vijanden dichtbij, links én rechts!',
-    stats: { kracht: 4, bereik: 3, snelheid: 2 },
-    attack: { type: 'hammer', cd: 0.60, dmg: 2 },
-    speed: 290, jump: 745,
+    desc: 'Slaat met zijn hamer keihard op de grond. De dreun raakt alle vijanden vlak naast hem, links én rechts!',
+    stats: { kracht: 5, bereik: 1, snelheid: 2 },
+    attack: { type: 'hammer', cd: 0.6, dmg: 3 },
+    speed: 255, jump: 740,
     look: {
       skin: '#d6a47c', skinShade: '#b7845d', cheek: '#e08c76', stubble: true,
       hair: '#a9a9a6', hairHi: '#d6d6d2', hairStyle: 'buzz',
@@ -103,10 +103,10 @@ export const CHARACTERS = [
   {
     id: 'lola', name: 'Lola', weapon: 'Pannenkoeken', kind: 'human', height: 78,
     power: 'Pannenkoek-boemerang',
-    desc: 'Gooit een pannenkoek als frisbee. Hij vliegt weg én komt terug, en raakt vijanden twee keer.',
-    stats: { kracht: 3, bereik: 4, snelheid: 3 },
-    attack: { type: 'pancake', cd: 0.55, dmg: 1 },
-    speed: 295, jump: 750,
+    desc: 'Gooit een pannenkoek als kleine boemerang. Hij vliegt een stukje weg, komt terug en raakt twee keer.',
+    stats: { kracht: 4, bereik: 2, snelheid: 2 },
+    attack: { type: 'pancake', cd: 0.5, dmg: 2 },
+    speed: 255, jump: 745,
     look: {
       skin: '#dfb08c', skinShade: '#c0906b', cheek: '#e8957f',
       hair: '#c9c9c6', hairHi: '#ececea', hairStyle: 'shortgrey',
@@ -205,7 +205,7 @@ function drawHuman(ctx, def, st) {
   if (L.hairStyle === 'bob') drawHairBackBob(ctx, L, headY, headR);
 
   // --- back arm ---
-  drawArm(ctx, -shoulderW * 0.35, shY + 2, backArm, 0.35, armLen, armW, shadeOf(L.top, L.topShade, true), L.topShade, L.skinShade, L, false, null);
+  if (!st.bust) drawArm(ctx, -shoulderW * 0.35, shY + 2, backArm, 0.35, armLen, armW, shadeOf(L.top, L.topShade, true), L.topShade, L.skinShade, L, false, null);
 
   // --- back leg ---
   leg(ctx, -2.5, hipY, legB, legLen, child ? 8 : 9, shadeOf(L.pants, darken(L.pants, .25), true), darken(L.pants, .35), darken(L.shoes, .15), bendB);
@@ -223,7 +223,7 @@ function drawHuman(ctx, def, st) {
   drawHead(ctx, L, headY, headR, st);
 
   // --- front arm + weapon ---
-  drawArm(ctx, shoulderW * 0.45, shY + 2, frontArm, frontElbow, armLen, armW + 0.4, L.top, L.topShade, L.skinShade, L, true, (hx, hy, ang) => {
+  if (!st.bust) drawArm(ctx, shoulderW * 0.45, shY + 2, frontArm, frontElbow, armLen, armW + 0.4, L.top, L.topShade, L.skinShade, L, true, (hx, hy, ang) => {
     if (!st.noWeapon) drawHeldWeapon(ctx, def, hx, hy, ang, atk, t);
   });
 
@@ -563,10 +563,18 @@ export function drawHeldWeapon(ctx, def, hx, hy, ang, atk, t) {
   } else if (type === 'wrench') {
     if (atk < 0 || atk < 0.5) { ctx.rotate(-ang + Math.PI); drawWrench(ctx, 0, -8, 1); }
   } else if (type === 'hammer') {
-    ctx.rotate(-ang + Math.PI);
-    ctx.fillStyle = '#9b6a3c'; ctx.fillRect(-1.6, -24, 3.2, 28);
-    ctx.fillStyle = '#5b636e'; roundRect(ctx, -8, -31, 16, 8, 2); ctx.fill();
-    ctx.fillStyle = '#8a939e'; ctx.fillRect(-8, -31, 16, 2.4);
+    // gewone klauwhamer: houten steel met een stalen kop dwars erop
+    ctx.rotate(-ang + Math.PI); ctx.scale(1.3, 1.3);
+    const wg = ctx.createLinearGradient(-2, 0, 2, 0); wg.addColorStop(0, '#a8743f'); wg.addColorStop(0.5, '#dcaa6c'); wg.addColorStop(1, '#9a6735');
+    ctx.fillStyle = wg; roundRect(ctx, -1.6, -24, 3.2, 28, 1.4); ctx.fill();
+    ctx.fillStyle = '#e04a3a'; roundRect(ctx, -2, -3, 4, 7, 1.6); ctx.fill();
+    const mg = ctx.createLinearGradient(0, -30, 0, -23); mg.addColorStop(0, '#e2e6eb'); mg.addColorStop(1, '#7c848e');
+    ctx.fillStyle = mg;
+    roundRect(ctx, -3.5, -30, 10, 6.5, 1.2); ctx.fill();          // kop
+    roundRect(ctx, 6, -30.8, 3.2, 8.2, 1); ctx.fill();            // slagvlak
+    ctx.beginPath(); ctx.moveTo(-3.5, -29.5); ctx.quadraticCurveTo(-7.5, -29, -9.5, -32); ctx.lineTo(-8.2, -28.2); ctx.quadraticCurveTo(-6.5, -25.5, -3.5, -24.5); ctx.closePath(); ctx.fill(); // klauw
+    ctx.strokeStyle = '#5c636c'; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.moveTo(-7, -30); ctx.lineTo(-5, -26.8); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.fillRect(-3, -29.4, 9, 1);
   } else if (type === 'pancake') {
     if (atk < 0 || atk < 0.5) { ctx.rotate(-ang + Math.PI); drawPancake(ctx, 0, -5, 0.8, t); }
   }
@@ -598,16 +606,30 @@ export function drawPie(ctx, x, y, s) {
   ctx.restore();
 }
 export function drawWrench(ctx, x, y, s, rot = 0) {
+  // grote pijptang: rood handvat, zilveren haakbek met tanden en een kartelring
   ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.scale(s, s);
-  ctx.fillStyle = '#9aa6b2'; ctx.fillRect(-1.6, -8, 3.2, 16);
-  ctx.beginPath(); ctx.arc(0, -10, 4.4, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#c6d0da'; ctx.fillRect(-0.6, -7, 1, 14);
-  ctx.fillStyle = 'rgba(0,0,0,0)';
-  ctx.globalCompositeOperation = 'destination-out';
-  ctx.fillRect(-1.4, -15.5, 2.8, 5);
-  ctx.globalCompositeOperation = 'source-over';
-  ctx.beginPath(); ctx.arc(0, 10, 3.2, 0, Math.PI * 2); ctx.fillStyle = '#9aa6b2'; ctx.fill();
-  ell(ctx, 0, 10, 1.4, 1.4, '#6f7b87');
+  // handle
+  const hg = ctx.createLinearGradient(-3, 0, 3, 0); hg.addColorStop(0, '#9e3a24'); hg.addColorStop(0.5, '#d5603f'); hg.addColorStop(1, '#8a2f1c');
+  ctx.fillStyle = hg; roundRect(ctx, -2.6, -4, 5.2, 20, 2.4); ctx.fill();
+  ctx.fillStyle = '#5a1e10'; ell(ctx, 0, 13.5, 1, 1.2, null); ctx.fill();
+  // housing
+  ctx.fillStyle = '#c4513a'; roundRect(ctx, -4.2, -10, 8.4, 8, 1.6); ctx.fill();
+  ctx.fillStyle = '#e07a5c'; ell(ctx, -2.2, -6, 0.9, 0.9, null); ctx.fill();
+  // knurled ring
+  ctx.fillStyle = '#5c6470'; roundRect(ctx, 1, -9, 3.6, 5.5, 1); ctx.fill();
+  ctx.strokeStyle = '#2f343b'; ctx.lineWidth = 0.4;
+  for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.moveTo(1.2, -8.4 + k * 1.3); ctx.lineTo(4.4, -8.4 + k * 1.3); ctx.stroke(); }
+  // lower jaw
+  const sg = ctx.createLinearGradient(-4, 0, 4, 0); sg.addColorStop(0, '#8d949c'); sg.addColorStop(0.5, '#dfe4e8'); sg.addColorStop(1, '#7d848c');
+  ctx.fillStyle = sg;
+  ctx.beginPath(); ctx.moveTo(-4.2, -10); ctx.lineTo(-7.5, -12); ctx.lineTo(-7.5, -14.5); ctx.lineTo(-1, -12.5); ctx.lineTo(-1, -10); ctx.closePath(); ctx.fill();
+  // shaft + hook jaw
+  ctx.fillRect(0.6, -21, 3, 11.5);
+  ctx.beginPath(); ctx.moveTo(3.6, -21); ctx.quadraticCurveTo(4, -25, 0, -25.5); ctx.lineTo(-7.5, -24); ctx.lineTo(-8.5, -21.5); ctx.lineTo(-7.5, -19.5); ctx.lineTo(0.6, -20); ctx.closePath(); ctx.fill();
+  // teeth
+  ctx.fillStyle = '#aeb4ba';
+  for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.moveTo(-7 + k * 1.8, -19.6); ctx.lineTo(-6.1 + k * 1.8, -18.4); ctx.lineTo(-5.2 + k * 1.8, -19.6); ctx.fill(); }
+  for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.moveTo(-7 + k * 1.8, -14.4); ctx.lineTo(-6.1 + k * 1.8, -15.6); ctx.lineTo(-5.2 + k * 1.8, -14.4); ctx.fill(); }
   ctx.restore();
 }
 export function drawPancake(ctx, x, y, s, t = 0) {
@@ -744,7 +766,7 @@ export function renderPortrait(canvas, def, opts = {}) {
   ctx.clearRect(0, 0, w, h);
   // ground shadow
   const isCat = def.kind === 'cat';
-  const scale = (opts.headOnly ? (isCat ? 3.2 : 2.6) : (isCat ? 2.3 : 1.95)) * (h / 210);
+  const scale = (opts.headOnly ? (isCat ? 3.2 : 2.6) : (isCat ? 2.3 : 1.95)) * Math.min(h / 210, (w / (isCat ? 190 : 150)));
   ctx.save();
   if (opts.headOnly) {
     ctx.translate(w * (isCat ? 0.08 : 0.5), h * (isCat ? 1.25 : 1.0) + (isCat ? 0 : def.height * scale * 0.62));

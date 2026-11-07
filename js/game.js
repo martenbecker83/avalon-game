@@ -37,7 +37,8 @@ export class Game {
   }
 
   // ---------- setup ----------
-  start({ worldIdx, level, checkpoint, coins, char }) {
+  start({ worldIdx, level, checkpoint, coins, char, lives = 3 }) {
+    this.lives = lives;
     this.worldIdx = worldIdx; this.world = WORLDS[worldIdx];
     this.char = char;
     this.level = level;
@@ -86,7 +87,7 @@ export class Game {
     };
   }
 
-  hud() { this.hooks.onHud({ hearts: this.p.hearts, max: MAX_HEARTS, coins: this.coins, label: `${this.world.name} · Level ${this.level}` }); }
+  hud() { this.hooks.onHud({ hearts: this.p.hearts, max: MAX_HEARTS, lives: this.lives, coins: this.coins, label: `${this.world.name} · Level ${this.level}` }); }
 
   addCoins(n, x, y) {
     this.coins += n;
@@ -157,7 +158,7 @@ export class Game {
         p.jumpsLeft = ph.doubleJump ? 1 : 0; sfx.jump();
         this.dust(p.x, p.y, 6);
       } else if (ph.swim && p.swimCd <= 0) {
-        p.vy = -d.jump * 0.62; p.swimCd = 0.22; p.jumpBuf = 0; sfx.bubble();
+        p.vy = -d.jump * 0.5; p.swimCd = 0.26; p.jumpBuf = 0; sfx.bubble();
         this.particles.push({ kind: 'bubble', x: p.x, y: p.y - p.h * 0.5, vx: 0, vy: -60, life: 1, max: 1 });
       } else if (ph.doubleJump && p.jumpsLeft > 0) {
         p.vy = -d.jump * 0.88; p.jumpsLeft--; p.jumpBuf = 0; p.cut = false; sfx.jump();
@@ -220,6 +221,11 @@ export class Game {
       if (!wasGround && prevB < p.y - 1) this.dust(p.x, p.y, 4);
       if (!p.standOn) p.safe = { x: p.x, y: p.y };
     }
+    if (ph.swim) {
+      const sup = this.groundBelow(p.x, p.y) ?? GROUND_Y;
+      const ceil = Math.min(sup, GROUND_Y) - 230;
+      if (p.y < ceil) { p.y = ceil; p.vy = Math.max(p.vy, 40); }
+    }
     if (Math.abs(p.vx) > 20 && p.onGround) p.walk += dt * Math.abs(p.vx) / 22;
 
     // fall in pit
@@ -239,7 +245,7 @@ export class Game {
         sfx.checkpoint();
         this.hooks.onBanner('Checkpoint!', null, 1200);
         for (let k = 0; k < 16; k++) this.particles.push({ kind: 'spark', x: c.x + 20, y: c.y - 90, vx: (Math.random() - 0.5) * 300, vy: -Math.random() * 300, life: 0.8, max: 0.8, color: ['#42c94a', '#ffd34d', '#fff'][k % 3] });
-        this.hooks.onCheckpoint({ level: this.level, checkpoint: this.checkpoint, coins: this.coins });
+        this.hooks.onCheckpoint({ level: this.level, checkpoint: this.checkpoint, coins: this.coins, lives: this.lives });
       }
     });
 
@@ -265,9 +271,14 @@ export class Game {
     if (!fall) { p.vy = -380; p.vx = -p.dir * 260; }
     this.hud();
     if (p.hearts <= 0) {
-      this.phase = 'dead'; this.phaseT = 0;
-      this.hooks.onBanner('Oeps!', 'Terug naar het checkpoint', 1600);
+      this.lives--;
+      this.phase = this.lives > 0 ? 'dead' : 'gameover'; this.phaseT = 0;
+      if (this.lives > 0) {
+        this.hooks.onBanner('Oeps!', this.lives === 1 ? 'Nog 1 leven' : `Nog ${this.lives} levens`, 1600);
+        this.hooks.onLifeLost({ level: this.level, checkpoint: this.checkpoint, coins: this.coinsAtCp, lives: this.lives });
+      } else this.hooks.onBanner('Game over', null, 1800);
       sfx.gameOver();
+      this.hud();
     }
   }
 
@@ -299,16 +310,16 @@ export class Game {
         break;
       case 'pie':
         p.atkT = p.atkDur = 0.3; sfx.throw();
-        this.projectiles.push({ type: 'pie', x: mx, y: my, vx: p.dir * 560 + p.vx * 0.3, vy: this.aimVy(mx, my, 560, 650, -150), g: 650, life: 1.8, age: 0, dmg: a.dmg, w: 28, h: 18, hit: new Set(), stun: 1.8 });
+        this.projectiles.push({ type: 'pie', x: mx, y: my, vx: p.dir * 430 + p.vx * 0.2, vy: this.aimVy(mx, my, 430, 650, -150), g: 650, life: 0.6, age: 0, dmg: a.dmg, w: 28, h: 18, hit: new Set(), stun: 1.8 });
         break;
       case 'wrench':
         p.atkT = p.atkDur = 0.24; sfx.throw();
-        this.projectiles.push({ type: 'wrench', x: mx, y: my, vx: p.dir * 720, vy: this.aimVy(mx, my, 720, 150, -40), g: 150, life: 1.1, age: 0, dmg: a.dmg, rot: 0, spin: p.dir * 22, w: 22, h: 22, hit: new Set() });
+        this.projectiles.push({ type: 'wrench', x: mx, y: my, vx: p.dir * 560, vy: this.aimVy(mx, my, 560, 150, -40), g: 150, life: 0.45, age: 0, dmg: a.dmg, rot: 0, spin: p.dir * 22, w: 22, h: 22, hit: new Set() });
         break;
       case 'pancake':
         if (this.projectiles.filter((q) => q.type === 'pancake').length >= 2) { p.cd = 0.1; return; }
         p.atkT = p.atkDur = 0.3; sfx.throw();
-        this.projectiles.push({ type: 'pancake', x: mx, y: my, vx: p.dir * 640, vy: this.aimVy(mx, my, 640, 0, 0) * 0.8, g: 0, life: 2.6, age: 0, dmg: a.dmg, rot: 0, spin: 18, w: 34, h: 18, hit: new Set(), boomerang: true, dir: p.dir, back: false, pierce: true });
+        this.projectiles.push({ type: 'pancake', x: mx, y: my, vx: p.dir * 560, vy: this.aimVy(mx, my, 560, 0, 0) * 0.8, g: 0, life: 1.6, age: 0, dmg: a.dmg, rot: 0, spin: 18, w: 34, h: 18, hit: new Set(), boomerang: true, dir: p.dir, back: false, pierce: true });
         break;
     }
   }
@@ -363,7 +374,7 @@ export class Game {
   hammerHit() {
     const p = this.p;
     sfx.thud(); this.shake = 6;
-    const box = { l: p.x - 130, r: p.x + 130, t: p.y - p.h - 40, b: p.y + 20 };
+    const box = { l: p.x - 105, r: p.x + 105, t: p.y - p.h - 40, b: p.y + 20 };
     for (const e of this.targets()) {
       const b = this.boxOf(e);
       if (overlap(box, b)) this.damage(e, this.char.attack.dmg, { kind: 'hammer', fromX: p.x });
@@ -382,7 +393,7 @@ export class Game {
     for (const q of this.projectiles) {
       q.age += dt;
       if (q.boomerang) {
-        if (!q.back && q.age > 0.38) { q.back = true; q.hit = new Set(); }
+        if (!q.back && q.age > 0.3) { q.back = true; q.hit = new Set(); }
         if (q.back) {
           const dx = p.x - q.x, dy = (p.y - p.h * 0.6) - q.y; const dist = Math.hypot(dx, dy) || 1;
           q.vx += (dx / dist) * 2600 * dt; q.vy += (dy / dist) * 2600 * dt;
@@ -767,6 +778,10 @@ export class Game {
   }
 
   updatePhase(dt) {
+    if (this.phase === 'gameover' && this.phaseT > 1.8) {
+      this.phase = 'done'; this.running = false;
+      this.hooks.onGameOver({ coins: this.coins, level: this.level });
+    }
     if (this.phase === 'dead' && this.phaseT > 1.6) {
       // respawn at checkpoint
       this.coins = this.coinsAtCp;
@@ -776,7 +791,7 @@ export class Game {
     }
     if (this.phase === 'leaving' && this.phaseT > 0.7) {
       this.phase = 'done'; this.running = false;
-      this.hooks.onLevelComplete({ level: this.level, coins: this.coins });
+      this.hooks.onLevelComplete({ level: this.level, coins: this.coins, lives: this.lives });
     }
     if (this.phase === 'freeing' && this.phaseT > 1.8 && !this.cageOpen) {
       this.cageOpen = true; this.phase = 'freed'; this.phaseT = 0;
@@ -905,7 +920,7 @@ export class Game {
 
     // fade when leaving through portal
     if (this.phase === 'leaving') { ctx.fillStyle = `rgba(255,255,255,${Math.min(1, this.phaseT / 0.7)})`; ctx.fillRect(0, 0, W, H); }
-    if (this.phase === 'dead') { ctx.fillStyle = `rgba(20,30,60,${Math.min(0.5, this.phaseT / 1.6)})`; ctx.fillRect(0, 0, W, H); }
+    if (this.phase === 'dead' || this.phase === 'gameover') { ctx.fillStyle = `rgba(20,30,60,${Math.min(0.5, this.phaseT / 1.6)})`; ctx.fillRect(0, 0, W, H); }
   }
 
   groundBelow(x, y) {
@@ -927,14 +942,14 @@ export class Game {
 
   drawPlayer(ctx) {
     const p = this.p;
-    if (p.inv > 0 && Math.floor(p.inv * 14) % 2 === 0 && this.phase !== 'dead') return;
+    if (p.inv > 0 && Math.floor(p.inv * 14) % 2 === 0 && this.phase !== 'dead' && this.phase !== 'gameover') return;
     ctx.save();
     ctx.translate(p.x, p.y);
     ctx.scale(p.dir, 1);
     const atk = p.atkT > 0 ? 1 - p.atkT / p.atkDur : -1;
     drawCharacter(ctx, this.char, {
       t: this.t, walk: p.walk, moving: Math.abs(p.vx) > 20, air: !p.onGround, vy: p.vy, atk,
-      hurt: p.inv > 1.1 || this.phase === 'dead', mic: this.char.attack.type === 'mic' && atk >= 0,
+      hurt: p.inv > 1.1 || this.phase === 'dead' || this.phase === 'gameover', mic: this.char.attack.type === 'mic' && atk >= 0,
     });
     ctx.restore();
   }
@@ -954,7 +969,7 @@ export class Game {
         case 'blob': ctx.fillStyle = q.color; ctx.beginPath(); ctx.arc(q.x, q.y, 5 * k + 2, 0, Math.PI * 2); ctx.fill(); break;
         case 'bubble': ctx.strokeStyle = 'rgba(230,250,255,.9)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(q.x, q.y, 5, 0, Math.PI * 2); ctx.stroke(); break;
         case 'hit': ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; const r1 = 6 + (1 - k) * 10, r2 = 16 + (1 - k) * 18; ctx.moveTo(q.x + Math.cos(a) * r1, q.y + Math.sin(a) * r1); ctx.lineTo(q.x + Math.cos(a) * r2, q.y + Math.sin(a) * r2); } ctx.stroke(); break;
-        case 'ring': ctx.strokeStyle = 'rgba(255,230,150,.9)'; ctx.lineWidth = 8 * k; ctx.beginPath(); ctx.ellipse(q.x, q.y - 4, 30 + (1 - k) * 110, 10 + (1 - k) * 18, 0, 0, Math.PI * 2); ctx.stroke(); break;
+        case 'ring': ctx.strokeStyle = 'rgba(255,230,150,.9)'; ctx.lineWidth = 8 * k; ctx.beginPath(); ctx.ellipse(q.x, q.y - 4, 30 + (1 - k) * 80, 10 + (1 - k) * 18, 0, 0, Math.PI * 2); ctx.stroke(); break;
         case 'slash': ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = 6 * k + 1; ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(q.x - q.dir * 20, q.y, 48, q.dir > 0 ? -1.3 : Math.PI - 0.2, q.dir > 0 ? 0.2 : Math.PI + 1.3); ctx.stroke(); break;
       }
     }

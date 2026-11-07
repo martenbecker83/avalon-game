@@ -191,7 +191,7 @@ export function generateLevel(worldIdx, level) {
       let py = g.y;
       const n = ri(3, 4);
       for (let i = 0; i < n; i++) {
-        py -= ri(70, Math.min(100, jumpH - 20));
+        py = Math.max(GROUND_Y - 300, py - ri(70, Math.min(100, jumpH - 20)));
         plats.push({ x: g.x + 60 + i * 150, y: py, w: 120, kind: 'plat' });
       }
       tokenSpots.push({ x: g.x + 60 + (n - 1) * 150 + 60, y: py - 42 });
@@ -241,9 +241,9 @@ export function generateLevel(worldIdx, level) {
 
   // choose 3 tokens and up to 2 hearts
   shuffle(tokenSpots, r);
-  const tokens = tokenSpots.slice(0, 3).map((p) => ({ id: id++, ...p }));
+  const tokens = tokenSpots.slice(0, 1).map((p) => ({ id: id++, ...p })); // 1 groene token per level
   // fallback tokens if not enough spots
-  while (tokens.length < 3) {
+  while (tokens.length < 1) {
     const g = grounds[2 + Math.floor(r() * (grounds.length - 4))];
     const p = { x: g.x + g.w / 2 - 60, y: g.y - 120, w: 120, kind: 'plat' };
     plats.push(p); tokens.push({ id: id++, x: p.x + 60, y: p.y - 42 });

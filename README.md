@@ -8,27 +8,31 @@ Kies een van de acht personages, elk met een eigen superkracht, en speel door vi
 
 | Personage | Wapen | Superkracht |
 |---|---|---|
-| Avalon | Zwaard | Snelle slagen dichtbij, de meeste schade |
-| Papa | Bierflesjes | Gooit in een boogje, schuim raakt vijanden in de buurt |
-| Mama | Microfoon | Schreeuwgolf die door alle vijanden heen gaat |
-| Fu-Chi | Klauwen | Supersnel krabben, snelste en hoogste springer |
-| Oma | Appeltaart | Taart in het gezicht: de vijand staat even stil |
-| Opa | Moersleutels | Draaiende sleutels ver en recht vooruit |
-| Lolo | Hamer | Klap op de grond die alle vijanden dichtbij raakt |
-| Lola | Pannenkoeken | Pannenkoek-boemerang die twee keer raakt |
+| Avalon | Zwaard | Supersnel, snelle zwaardslagen dichtbij |
+| Fu-Chi | Klauwen | Supersnel krabben, springt het hoogst |
+| Papa | Bierflesjes | Veelzijdig: gooit ver in een boogje, schuim raakt vijanden in de buurt |
+| Mama | Microfoon | Veelzijdig: schreeuwgolf die door alle vijanden heen gaat |
+| Oma | Appeltaart | Langzaam, kort bereik, veel kracht; de vijand staat even stil |
+| Opa | Moersleutel | Langzaam, kort bereik, de meeste kracht |
+| Lolo | Hamer | Langzaam, klap op de grond die alle vijanden vlak naast hem raakt |
+| Lola | Pannenkoeken | Langzaam, korte pannenkoek-boemerang die twee keer raakt |
+
+## Levens en hartjes
+
+Een spel (één wereld) begin je met 3 levens. Binnen een leven heb je 3 hartjes. Zijn je hartjes op, dan verlies je een leven en ga je terug naar het laatste checkpoint. Bij elk nieuw level krijg je je hartjes weer terug. Zijn je levens op, dan is het game over: je ziet je score, kunt hem registreren en de wereld begint weer bij level 1. Daarna kies je opnieuw een personage. Tijdens een spel kun je niet van personage wisselen.
 
 ## Munten
 
 - Vijand verslaan: 1 munt
 - Moeilijke vijand verslaan: 2 munten
-- Groene A-token vinden: 5 munten
+- Groene A-token vinden (één per level, goed verstopt): 5 munten
 - Mini-baas verslaan: 10 munten
 - Eindbaas verslaan: 25 munten
 
 ## Besturing
 
 - **Laptop:** pijltjes of A/D lopen, spatie of pijl omhoog springen, X of J aanvallen, Esc pauze
-- **iPad:** knoppen op het scherm (speel met het scherm liggend)
+- **iPad:** joystick links om te lopen, knoppen rechts om aan te vallen en te springen (speel met het scherm liggend). Zet de game via Delen > Zet op beginscherm als app op je iPad.
 - In de Lucht-wereld kun je dubbel springen, onderwater kun je zwemmen door steeds op springen te drukken.
 
 ## Scores
@@ -38,7 +42,7 @@ Na een uitgespeelde wereld (of als je stopt en je score registreert) typ je je i
 ## Techniek
 
 - Gewone HTML, CSS en JavaScript, geen build-stap nodig. Alle personages en werelden worden in code getekend; er staan geen foto's in de game.
-- Muziek en geluid worden live gemaakt met WebAudio.
+- Muziek en geluidseffecten worden live gemaakt met WebAudio en zijn in het hoofdmenu los aan en uit te zetten.
 - Het gedeelde scorebord draait als Netlify Function (`netlify/functions/scores.mjs`) met Netlify Blobs als opslag.
 
 Lokaal testen: start een eenvoudige webserver in deze map, bijvoorbeeld `python3 -m http.server`, en open `http://localhost:8000`. Het algemene scorebord werkt alleen op Netlify (of met `netlify dev`).

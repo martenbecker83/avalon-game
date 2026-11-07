@@ -54,16 +54,47 @@ export function initInput(onPause) {
     }
     return null;
   };
+  // joystick (left side): drag the knob left/right to walk
+  const stick = document.getElementById('stick');
+  const knob = document.getElementById('stick-knob');
+  let stickId = null, stickCx = 0;
+  const stickMove = (x) => {
+    const max = stick.clientWidth * 0.34;
+    const dx = Math.max(-max, Math.min(max, x - stickCx));
+    knob.style.transform = `translate(${dx}px, 0)`;
+    const dead = max * 0.22;
+    if (keys.left !== dx < -dead) set('left', dx < -dead);
+    if (keys.right !== dx > dead) set('right', dx > dead);
+  };
+  const stickEnd = () => { stickId = null; knob.style.transform = ''; set('left', false); set('right', false); stick.classList.remove('on'); };
+  const inStick = (x, y) => {
+    const r = stick.getBoundingClientRect(); const pad = 70;
+    return x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad;
+  };
+
   const touchArea = document.getElementById('touch');
   const handle = (e) => {
     e.preventDefault();
     for (const t of e.changedTouches) {
-      if (e.type === 'touchend' || e.type === 'touchcancel') active.delete(t.identifier);
+      const end = e.type === 'touchend' || e.type === 'touchcancel';
+      if (t.identifier === stickId) { if (end) stickEnd(); else stickMove(t.clientX); continue; }
+      if (e.type === 'touchstart' && stickId === null && inStick(t.clientX, t.clientY)) {
+        stickId = t.identifier; const r = stick.getBoundingClientRect(); stickCx = r.left + r.width / 2;
+        stick.classList.add('on'); stickMove(t.clientX); continue;
+      }
+      if (end) active.delete(t.identifier);
       else { const k = hit(t.clientX, t.clientY); if (k) active.set(t.identifier, k); else active.delete(t.identifier); }
     }
     refresh();
   };
   for (const ev of ['touchstart', 'touchmove', 'touchend', 'touchcancel']) touchArea.addEventListener(ev, handle, { passive: false });
+  // mouse fallback for the joystick (testing on a laptop)
+  stick.addEventListener('mousedown', (e) => {
+    const r = stick.getBoundingClientRect(); stickCx = r.left + r.width / 2; stickId = 'mouse'; stickMove(e.clientX);
+    const mv = (ev) => stickMove(ev.clientX);
+    const up = () => { stickEnd(); window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up); };
+    window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
+  });
   // mouse fallback for touch buttons (testing on laptop)
   for (const b of btns) {
     b.addEventListener('mousedown', () => { active.set('m' + b.dataset.k, b.dataset.k); refresh(); });

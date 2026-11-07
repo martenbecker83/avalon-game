@@ -13,11 +13,11 @@ export function getProgress(worldId) { return read(KEY_PROGRESS, {})[worldId] ||
 export function setProgress(worldId, p) { const all = read(KEY_PROGRESS, {}); all[worldId] = p; write(KEY_PROGRESS, all); }
 export function clearProgress(worldId) {
   const all = read(KEY_PROGRESS, {}); const old = all[worldId];
-  all[worldId] = { level: 1, checkpoint: 0, coins: 0, active: false, freed: old?.freed || false };
+  all[worldId] = { level: 1, checkpoint: 0, coins: 0, lives: 3, active: false, freed: old?.freed || false };
   write(KEY_PROGRESS, all);
 }
 
-export function getSettings() { return read(KEY_SETTINGS, { sound: true, character: 'avalon', initials: '' }); }
+export function getSettings() { return { music: true, sfx: true, character: 'avalon', initials: '', ...read(KEY_SETTINGS, {}) }; }
 export function setSettings(s) { write(KEY_SETTINGS, { ...getSettings(), ...s }); }
 
 export function getLocalScores() { return read(KEY_SCORES, []); }

@@ -1,6 +1,6 @@
 // Muziek en geluidseffecten, volledig gesynthetiseerd met WebAudio (geen bestanden nodig)
 let ac = null, master = null, musicGain = null, sfxGain = null;
-let enabled = true;
+let musicOn = true, sfxOn = true;
 let music = null;
 
 export function initAudio() {
@@ -8,15 +8,18 @@ export function initAudio() {
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return;
   ac = new AC();
-  master = ac.createGain(); master.gain.value = enabled ? 0.9 : 0; master.connect(ac.destination);
-  musicGain = ac.createGain(); musicGain.gain.value = 0.32; musicGain.connect(master);
-  sfxGain = ac.createGain(); sfxGain.gain.value = 0.7; sfxGain.connect(master);
+  master = ac.createGain(); master.gain.value = 0.9; master.connect(ac.destination);
+  musicGain = ac.createGain(); musicGain.gain.value = musicOn ? 0.32 : 0; musicGain.connect(master);
+  sfxGain = ac.createGain(); sfxGain.gain.value = sfxOn ? 0.7 : 0; sfxGain.connect(master);
 }
-export function setSound(on) {
-  enabled = on;
-  if (master) master.gain.setTargetAtTime(on ? 0.9 : 0, ac.currentTime, 0.05);
+export function setMusic(on) {
+  musicOn = on;
+  if (musicGain) musicGain.gain.setTargetAtTime(on ? 0.32 : 0, ac.currentTime, 0.05);
 }
-export const soundOn = () => enabled;
+export function setSfx(on) {
+  sfxOn = on;
+  if (sfxGain) sfxGain.gain.setTargetAtTime(on ? 0.7 : 0, ac.currentTime, 0.05);
+}
 
 function noiseBuffer() {
   if (noiseBuffer.buf) return noiseBuffer.buf;

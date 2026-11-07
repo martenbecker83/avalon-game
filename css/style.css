@@ -77,7 +77,7 @@ button { font-family: inherit; color: inherit; cursor: pointer; border: 0; }
   width: 100%; max-width: 1100px;
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
 }
-@media (max-width: 700px) { .char-grid { grid-template-columns: repeat(2, 1fr); } }
+
 .card {
   background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow);
   border: 4px solid transparent; padding: 10px; text-align: center; transition: transform .08s, border-color .15s;
@@ -196,3 +196,47 @@ button { font-family: inherit; color: inherit; cursor: pointer; border: 0; }
 .keyboard button.wide { grid-column: span 2; font-size: 17px; }
 .keyboard button:active { transform: translateY(2px); box-shadow: 0 1px 0 #c9d6e4; }
 .modal-portrait { width: 110px; height: 110px; border-radius: 20px; background: linear-gradient(180deg,#dff3ff,#f6fbff); }
+
+/* ---------- compacte personagekeuze: alles op één scherm ---------- */
+#scr-chars { height: 100%; overflow: hidden; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+#scr-chars .scr-head { margin-bottom: 8px; flex: none; }
+#scr-chars .char-grid { flex: 1 1 auto; min-height: 0; grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 10px; }
+#scr-chars .card { display: flex; flex-direction: column; min-height: 0; padding: 6px; }
+#scr-chars .card canvas { flex: 1 1 auto; min-height: 0; aspect-ratio: auto; width: 100%; height: 100%; }
+#scr-chars .card .c-name { font-size: clamp(17px, 2.4vh, 24px); margin-top: 2px; }
+#scr-chars .card .c-weapon { font-size: clamp(12px, 1.7vh, 15px); line-height: 1.1; }
+#scr-chars .char-detail { flex: none; margin-top: 10px; padding: 10px 16px; gap: 12px; }
+#scr-chars .char-detail h3 { font-size: 22px; }
+#scr-chars .char-detail p { font-size: 16px; }
+#scr-chars .char-detail .big-btn { font-size: 24px; min-width: 200px; padding: 8px 24px; }
+@media (max-width: 560px) {
+  #scr-chars { overflow-y: auto; height: auto; min-height: 100%; }
+  #scr-chars .char-grid { grid-template-columns: repeat(2, 1fr); grid-template-rows: none; }
+  #scr-chars .card canvas { height: 150px; }
+}
+
+/* ---------- geluidsknoppen ---------- */
+.sound-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.sound-row .big-btn.small { min-width: 170px; font-size: 18px; }
+.big-btn.off { opacity: .6; }
+
+/* ---------- levens in de HUD ---------- */
+.hud-row { display: flex; gap: 8px; align-items: center; }
+#hud-lives { display: inline-flex; align-items: center; gap: 2px; background: rgba(255,255,255,.88); border-radius: 999px; padding: 2px 12px 2px 4px; font-size: 22px; font-weight: 800; box-shadow: 0 3px 0 rgba(0,0,0,.12); }
+#hud-life-ico { width: 30px; height: 30px; border-radius: 50%; background: #e6f3fe; }
+
+/* ---------- joystick ---------- */
+#stick { position: relative; width: 170px; height: 110px; border-radius: 60px; background: rgba(255,255,255,.35); box-shadow: inset 0 3px 8px rgba(20,50,90,.25); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); touch-action: none; }
+#stick::before, #stick::after { content: '◀'; position: absolute; top: 50%; left: 14px; transform: translateY(-50%); color: rgba(20,50,90,.45); font-size: 22px; }
+#stick::after { content: '▶'; left: auto; right: 14px; }
+#stick-knob { position: absolute; left: 50%; top: 50%; width: 76px; height: 76px; margin: -38px 0 0 -38px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #dde8f3); box-shadow: 0 5px 0 rgba(20,50,90,.25), 0 8px 16px rgba(20,50,90,.2); transition: transform .08s; }
+#stick.on #stick-knob { transition: none; }
+
+.score-head { display: flex; align-items: center; justify-content: center; gap: 16px; }
+.score-head p { margin: 0; }
+.modal-portrait.small { width: 80px; height: 80px; }
+.keyboard { grid-template-columns: repeat(9, 1fr); gap: 5px; }
+.keyboard button { padding: 6px 0; font-size: 20px; }
+.ini-box { width: 62px; height: 70px; font-size: 44px; }
+.modal-card h2 { font-size: 30px; }
+@media (max-height: 720px) { .modal-card { padding: 14px 20px; } .modal-card p { margin-bottom: 8px; font-size: 17px; } .big-score { font-size: 44px; } }
