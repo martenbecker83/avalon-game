@@ -7,6 +7,7 @@ import { CHARACTERS, charById, renderPortrait, drawCharacter } from './character
 import { WORLDS } from './worlds.js';
 import { drawWorldPreview, drawBackground, drawGround } from './art.js';
 import { Game } from './game.js';
+import { createFinale } from './finale.js';
 import { initInput, isTouch, clearPressed } from './input.js';
 import { initAudio, setMusic, setSfx, sfx, playMusic } from './audio.js';
 import * as store from './storage.js';
@@ -196,7 +197,10 @@ function buildWorlds() {
   grid.innerHTML = '';
   const done = run?.completed || [];
   const c = runChar();
-  $('#world-sub').innerHTML = run ? `Je speelt met <b>${esc(c.name)}</b> · ${run.coins} munten · ${run.lives} ${run.lives === 1 ? 'leven' : 'levens'}` : '';
+  $('#world-sub').innerHTML = run ? `<span class="chip"><canvas class="chip-ico" id="ws-ico"></canvas>${esc(c.name)}</span>
+    <span class="chip"><span class="coin-ico">A</span>${run.coins}</span>
+    <span class="chip lives">${'<svg viewBox="0 0 32 30"><path d="M16 28C4 19 1 13 1 8.5 1 4.4 4.3 1 8.5 1c3 0 5.6 1.8 7.5 4.6C17.9 2.8 20.5 1 23.5 1 27.7 1 31 4.4 31 8.5 31 13 28 19 16 28z"/></svg>'.repeat(run.lives)}<small>${run.lives === 1 ? 'leven' : 'levens'}</small></span>` : '';
+  if (run) renderHead($('#ws-ico'), c, 30);
   WORLDS.forEach((w, idx) => {
     const got = done.includes(w.id);
     const card = document.createElement('button');
@@ -325,8 +329,25 @@ function endRun(kind) {
     else if (e.key === 'Enter' && ini.length) save();
   };
   window.addEventListener('keydown', onKey);
-  render();
-  if (kind === 'won') sfx.victory();
+  if (kind === 'won') playFinale(c, render); else render();
+}
+
+// ---------- slot-parade ----------
+let finale = null, finaleDone = null;
+function playFinale(hero, then) {
+  finale = createFinale(hero); finaleDone = then;
+  mode = 'finale'; hideScreens(); closeModal();
+  playMusic('title'); sfx.victory();
+  const btn = document.createElement('button');
+  btn.id = 'finale-skip'; btn.className = 'big-btn small'; btn.textContent = 'Verder ›';
+  btn.addEventListener('click', () => { sfx.click(); endFinale(); });
+  document.body.appendChild(btn);
+}
+function endFinale() {
+  if (!finale) return;
+  finale = null; mode = 'menu';
+  document.getElementById('finale-skip')?.remove();
+  const f = finaleDone; finaleDone = null; if (f) f();
 }
 
 // ---------- scoreboard ----------
@@ -349,11 +370,13 @@ async function buildScores(tab) {
   const mine = highlightId ? rows.findIndex((r) => r.id === highlightId) : -1;
   const addRow = (r, i) => {
     const c = charById(r.character);
-    const done = Array.isArray(r.worlds) ? r.worlds : (r.world ? [r.world] : []);
+    const done = Array.isArray(r.worlds) ? r.worlds : []; // oude scores (met alleen de gespeelde wereld) krijgen geen sticker
     const row = document.createElement('div');
     row.className = `score-row ${i < 3 ? 'top' + (i + 1) : ''} ${r.id && r.id === highlightId ? 'me' : ''}`;
-    row.innerHTML = `<span class="rank">${i + 1}</span><span class="ini">${esc(r.initials)}</span>
-      <span class="who"><canvas title="${c.name}"></canvas><span><span class="medal-row mini">${medalsHtml(done)}</span><small>${esc(fmtDate(r.date))}</small></span></span>
+    const cup = i < 3 ? `<svg class="cup c${i + 1}" viewBox="0 0 32 32"><path d="M9 4h14v7a7 7 0 0 1-14 0z"/><path d="M9 6H4v2a5 5 0 0 0 5 5M23 6h5v2a5 5 0 0 1-5 5" fill="none" stroke-width="2.4"/><rect x="14" y="17" width="4" height="6"/><rect x="9" y="23" width="14" height="4" rx="1.5"/></svg>` : '';
+    row.innerHTML = `<span class="rank">${cup}<b>${i + 1}</b></span><span class="ini">${esc(r.initials)}</span>
+      <canvas class="face" title="${c.name}"></canvas><span class="date">${esc(fmtDate(r.date))}</span>
+      <span class="medal-row mini">${medalsHtml(done, false)}</span>
       <span class="pts">${r.score}</span>`;
     list.appendChild(row);
     renderHead(row.querySelector('canvas'), c);
@@ -378,8 +401,9 @@ function renderHead(cv, def, size = 40) {
   cv.width = size * dpr; cv.height = size * dpr;
   const ctx = cv.getContext('2d'); ctx.setTransform(dpr * size / 40, 0, 0, dpr * size / 40, 0, 0);
   ctx.save();
-  if (def.kind === 'cat') { ctx.translate(-8, 82); ctx.scale(1.6, 1.6); }
-  else { const k = 155 / def.height; ctx.translate(20, 28 + def.height * 0.86 * k * 0.6); ctx.scale(k * 0.6, k * 0.6); }
+  // het hoofd netjes in het midden van het rondje
+  if (def.kind === 'cat') { ctx.translate(-15, 71); ctx.scale(1.6, 1.6); }
+  else { const k = 155 / def.height; ctx.translate(19, 22 + def.height * 0.86 * k * 0.6); ctx.scale(k * 0.6, k * 0.6); }
   drawCharacter(ctx, def, { t: 0.5, walk: 0, moving: false, air: false, atk: -1, noWeapon: true, bust: true });
   ctx.restore();
 }
@@ -431,6 +455,12 @@ function frame(now) {
   if (mode === 'play' && game.lv) {
     game.update(dt / 2); game.update(dt / 2); // two half steps for smoother physics
     game.render();
+  } else if (mode === 'finale' && finale) {
+    finale.update(dt);
+    const ctx = canvas.getContext('2d'); const s = canvas.height / 540;
+    ctx.setTransform(s, 0, 0, s, 0, 0);
+    finale.render(ctx, canvas.width / s, 540);
+    if (finale.done) endFinale();
   } else renderTitle(dt);
   requestAnimationFrame(frame);
 }
@@ -445,6 +475,7 @@ window.addEventListener('pointerdown', () => { initAudio(); if (mode === 'menu')
 if (location.search.includes('debug')) {
   window.__avalon = {
     game, WORLDS, get run() { return run; },
+    finale(id = 'avalon') { playFinale(charById(id), () => {}); },
     play(worldIdx, charId, level = 1) {
       selectedChar = charById(charId);
       run = { char: charId, lives: 3, coins: 0, completed: [], current: null };

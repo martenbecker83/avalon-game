@@ -285,6 +285,8 @@ export function drawCoin(ctx, x, y, t, s = 1) {
   ctx.save(); ctx.translate(x, y); ctx.scale(Math.cos(t * 8) * s, s);
   ell(ctx, 0, 0, 11, 11, rg(ctx, 0, 0, 11, '#fff6b0', '#e0a100'));
   ctx.strokeStyle = '#b07800'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = '#9a6400'; ctx.font = '800 13px "Baloo 2", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('A', 0, 1); ctx.textBaseline = 'alphabetic';
   ctx.restore();
 }
 export function drawCheckpoint(ctx, x, y, active, t) {

@@ -27,7 +27,9 @@ export class Game {
 
   resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = window.innerWidth, h = window.innerHeight;
+    // meet het canvas zelf: op een iPad (zeker als app op het beginscherm) wijkt 100vh af van de echte hoogte,
+    // waardoor het beeld uitgerekt en wazig werd
+    const w = this.cv.clientWidth || window.innerWidth, h = this.cv.clientHeight || window.innerHeight;
     this.cv.width = Math.round(w * dpr); this.cv.height = Math.round(h * dpr);
     this.scale = (h * dpr) / VIEW_H;
     this.viewW = (w * dpr) / this.scale;

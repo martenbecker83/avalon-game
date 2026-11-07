@@ -4,7 +4,7 @@ export const CHARACTERS = [
   {
     id: 'avalon', name: 'Avalon', weapon: 'Zwaard', kind: 'human', height: 72,
     power: 'Zwaardslag',
-    desc: 'Snelle slagen dichtbij met haar zwaard. Avalon is supersnel en hakt flink door.',
+    desc: 'Supersnel, met snelle zwaardslagen dichtbij.',
     stats: { kracht: 3, bereik: 2, snelheid: 5 },
     attack: { type: 'sword', cd: 0.30, dmg: 2 },
     speed: 355, jump: 790,
@@ -19,7 +19,7 @@ export const CHARACTERS = [
   {
     id: 'papa', name: 'Papa', weapon: 'Bierflesjes', kind: 'human', height: 88,
     power: 'Flessenworp',
-    desc: 'Gooit bierflesjes in een boogje, ver en over obstakels heen. Ploep: schuim op iedereen in de buurt! Goed in alles.',
+    desc: 'Gooit flesjes ver in een boog. Schuim raakt de buren!',
     stats: { kracht: 3, bereik: 4, snelheid: 4 },
     attack: { type: 'bottle', cd: 0.40, dmg: 1 },
     speed: 320, jump: 770,
@@ -34,7 +34,7 @@ export const CHARACTERS = [
   {
     id: 'mama', name: 'Mama', weapon: 'Microfoon', kind: 'human', height: 84,
     power: 'Schreeuwgolf',
-    desc: 'Schreeuwt in haar microfoon. De geluidsgolf gaat dwars door ALLE vijanden heen. Goed in alles.',
+    desc: 'Haar schreeuw gaat dwars door alle vijanden heen.',
     stats: { kracht: 4, bereik: 4, snelheid: 4 },
     attack: { type: 'mic', cd: 0.90, dmg: 2 },
     speed: 320, jump: 770,
@@ -49,7 +49,7 @@ export const CHARACTERS = [
   {
     id: 'fuchi', name: 'Fu-Chi', weapon: 'Klauwen', kind: 'cat', height: 48,
     power: 'Klauwenstorm',
-    desc: 'Supersnel krabben met haar klauwen. Fu-Chi is net zo snel als Avalon en springt het hoogst van iedereen.',
+    desc: 'Supersnel krabben en springt het hoogst van iedereen.',
     stats: { kracht: 2, bereik: 1, snelheid: 5 },
     attack: { type: 'claws', cd: 0.15, dmg: 1 },
     speed: 360, jump: 880,
@@ -58,7 +58,7 @@ export const CHARACTERS = [
   {
     id: 'oma', name: 'Oma', weapon: 'Appeltaart', kind: 'human', height: 80,
     power: 'Taart-in-je-gezicht',
-    desc: 'Duwt een appeltaart vol in het gezicht van vijanden dichtbij. Hard raak, en de vijand ziet even niks!',
+    desc: 'Taart vol in het gezicht: de vijand ziet even niks!',
     stats: { kracht: 4, bereik: 2, snelheid: 2 },
     attack: { type: 'pie', cd: 0.5, dmg: 2 },
     speed: 255, jump: 745,
@@ -73,7 +73,7 @@ export const CHARACTERS = [
   {
     id: 'opa', name: 'Opa', weapon: 'Moersleutel', kind: 'human', height: 90,
     power: 'Sleutelsmijter',
-    desc: 'Smijt met zijn grote moersleutel. Komt niet ver, maar als hij raakt, dan raakt hij hard!',
+    desc: 'Smijt zijn moersleutel. Niet ver, maar keihard.',
     stats: { kracht: 5, bereik: 2, snelheid: 2 },
     attack: { type: 'wrench', cd: 0.45, dmg: 3 },
     speed: 255, jump: 740,
@@ -88,7 +88,7 @@ export const CHARACTERS = [
   {
     id: 'lolo', name: 'Lolo', weapon: 'Hamer', kind: 'human', height: 82,
     power: 'Hamerdreun',
-    desc: 'Slaat met zijn hamer keihard op de grond. De dreun raakt alle vijanden vlak naast hem, links én rechts!',
+    desc: 'Dreunt op de grond en raakt vijanden links en rechts.',
     stats: { kracht: 5, bereik: 1, snelheid: 2 },
     attack: { type: 'hammer', cd: 0.6, dmg: 3 },
     speed: 255, jump: 740,
@@ -103,7 +103,7 @@ export const CHARACTERS = [
   {
     id: 'lola', name: 'Lola', weapon: 'Pannenkoeken', kind: 'human', height: 78,
     power: 'Pannenkoek-boemerang',
-    desc: 'Gooit een pannenkoek als kleine boemerang. Hij vliegt een stukje weg, komt terug en raakt twee keer.',
+    desc: 'Pannenkoek-boemerang die heen én terug raakt.',
     stats: { kracht: 4, bereik: 2, snelheid: 2 },
     attack: { type: 'pancake', cd: 0.5, dmg: 2 },
     speed: 255, jump: 745,
