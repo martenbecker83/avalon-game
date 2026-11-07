@@ -199,8 +199,8 @@ function buildWorlds() {
   const c = runChar();
   $('#world-sub').innerHTML = run ? `<span class="chip"><canvas class="chip-ico" id="ws-ico"></canvas>${esc(c.name)}</span>
     <span class="chip"><span class="coin-ico">A</span>${run.coins}</span>
-    <span class="chip lives">${'<svg viewBox="0 0 32 30"><path d="M16 28C4 19 1 13 1 8.5 1 4.4 4.3 1 8.5 1c3 0 5.6 1.8 7.5 4.6C17.9 2.8 20.5 1 23.5 1 27.7 1 31 4.4 31 8.5 31 13 28 19 16 28z"/></svg>'.repeat(run.lives)}<small>${run.lives === 1 ? 'leven' : 'levens'}</small></span>` : '';
-  if (run) renderHead($('#ws-ico'), c, 30);
+    <span class="chip" title="levens"><canvas class="chip-ico" id="ws-life"></canvas>×${run.lives}</span>` : '';
+  if (run) { renderHead($('#ws-ico'), c, 30); renderHead($('#ws-life'), c, 30); }
   WORLDS.forEach((w, idx) => {
     const got = done.includes(w.id);
     const card = document.createElement('button');
@@ -287,6 +287,7 @@ function endRun(kind) {
   hideScreens();
   const c = charById(finished.char);
   const score = finished.coins, done = finished.completed;
+  if (!score && kind !== 'won') { show('title'); return; } // niets verdiend: niet opslaan, terug naar het hoofdmenu
   let ini = (settings.initials || '').slice(0, 3).split('');
   const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
   const title = kind === 'won' ? 'Alles uitgespeeld!' : kind === 'gameover' ? 'Game over' : 'Spel gestopt';

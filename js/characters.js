@@ -585,14 +585,35 @@ export function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
 }
 export function drawBottle(ctx, x, y, s) {
+  // groene beugelfles: bolle buik, korte hals, witte porseleinen dop met rood rubbertje en een metalen beugel
   ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
-  const g = ctx.createLinearGradient(-4, 0, 4, 0); g.addColorStop(0, '#2f6d1f'); g.addColorStop(0.4, '#5fae3e'); g.addColorStop(1, '#245716');
-  ctx.fillStyle = g; roundRect(ctx, -4, -6, 8, 14, 3); ctx.fill();
-  ctx.fillRect(-1.6, -12, 3.2, 7);
-  ctx.fillStyle = '#d8d8d8'; ctx.fillRect(-1.9, -13.5, 3.8, 2);
-  ctx.fillStyle = '#f2ead0'; ctx.fillRect(-3.2, -2, 6.4, 5);
-  ctx.fillStyle = '#c0392b'; ctx.fillRect(-3.2, -0.5, 6.4, 1.6);
-  ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.fillRect(-3, -5, 1.2, 11);
+  const g = ctx.createLinearGradient(-5, 0, 5, 0);
+  g.addColorStop(0, '#1f5a12'); g.addColorStop(0.35, '#6fc23f'); g.addColorStop(0.55, '#4a9a26'); g.addColorStop(1, '#1b4f10');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(-2, -12); ctx.lineTo(2, -12);              // hals
+  ctx.quadraticCurveTo(2.2, -8, 4.6, -5.5);             // schouder
+  ctx.lineTo(4.8, 7); ctx.quadraticCurveTo(4.8, 9, 3, 9);
+  ctx.lineTo(-3, 9); ctx.quadraticCurveTo(-4.8, 9, -4.8, 7);
+  ctx.lineTo(-4.6, -5.5); ctx.quadraticCurveTo(-2.2, -8, -2, -12);
+  ctx.closePath(); ctx.fill();
+  // ingegoten embleem op de buik
+  ctx.strokeStyle = 'rgba(200,255,160,.35)'; ctx.lineWidth = 0.5;
+  ctx.beginPath(); ctx.ellipse(0, 2.5, 2.6, 4.2, 0, 0, Math.PI * 2); ctx.stroke();
+  // groen-witte halsetiket
+  ctx.fillStyle = '#0f3d22'; ctx.beginPath(); ctx.moveTo(-2.6, -10); ctx.lineTo(2.6, -10); ctx.lineTo(4, -5.8); ctx.lineTo(-4, -5.8); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#f4f1e6'; ctx.beginPath(); ctx.ellipse(0, -6.4, 3.2, 1.8, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#d23a2a'; ctx.fillRect(-1.8, -6.8, 3.6, 0.8);
+  // rubbertje + porseleinen dop
+  ctx.fillStyle = '#d6352b'; ctx.fillRect(-2.2, -12.9, 4.4, 1);
+  ctx.fillStyle = '#f7f7f5'; ctx.beginPath(); ctx.ellipse(0, -14, 2.4, 1.5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#c9c9c4'; ctx.lineWidth = 0.4; ctx.stroke();
+  // metalen beugel
+  ctx.strokeStyle = '#b9bfc6'; ctx.lineWidth = 0.6;
+  ctx.beginPath(); ctx.moveTo(-2.3, -14); ctx.lineTo(-2.9, -10.5); ctx.moveTo(2.3, -14); ctx.lineTo(2.9, -10.5); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-2.4, -15.2); ctx.quadraticCurveTo(0, -17, 2.4, -15.2); ctx.stroke();
+  // glans
+  ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.fillRect(-3.4, -4, 1, 11);
   ctx.restore();
 }
 export function drawPie(ctx, x, y, s) {
