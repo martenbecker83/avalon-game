@@ -112,6 +112,7 @@ $('#btn-play').addEventListener('click', () => {
     </div>`, (act) => {
     if (act === 'continue') { closeModal(); resumeRun(); }
     if (act === 'new') {
+      if (!run.coins) { closeModal(); endRun('stop'); return; } // 0 munten: geen bevestiging nodig
       modal(`<h2>Nieuw spel?</h2><p>Je huidige spel stopt en je score van <b>${run.coins} munten</b> wordt geregistreerd.</p>
         <div class="menu"><button class="big-btn" data-act="yes">Ja, stoppen</button><button class="big-btn alt" data-act="no">Nee, terug</button></div>`, (a2) => {
         closeModal();
@@ -254,6 +255,7 @@ function pause() {
     </div>`, (act) => {
     if (act === 'resume') { closeModal(); game.paused = false; clearPressed(); }
     if (act === 'stop') {
+      if (!game.coins) { closeModal(); run.coins = 0; endRun('stop'); return; } // 0 munten: geen bevestiging nodig
       modal(`<h2>Stoppen?</h2><p>Je spel stopt en je score van <b>${game.coins} munten</b> wordt geregistreerd.</p>
         <div class="menu"><button class="big-btn" data-act="yes">Ja, stoppen</button><button class="big-btn alt" data-act="no">Nee, verder spelen</button></div>`, (a2) => {
         if (a2 === 'no') { closeModal(); game.paused = false; clearPressed(); }

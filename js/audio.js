@@ -145,32 +145,42 @@ export function playMusic(name) {
   const def = SONGS[name] || SONGS.title;
   const song = buildSong(def);
   const step = 60 / def.bpm / 2; // eighth notes
+  // elk nummer krijgt een eigen volumeknop, zodat we het bij wisselen meteen helemaal kunnen dempen
+  const songGain = ac.createGain(); songGain.gain.value = 1; songGain.connect(musicGain);
   let i = 0;
   let next = ac.currentTime + 0.1;
   const timer = setInterval(() => {
-    if (!ac) return;
+    if (!ac || music?.timer !== timer) return;
+    // timers lopen soms achter (iPad, tabblad op de achtergrond): sla gemiste noten over in plaats van ze allemaal tegelijk af te spelen
+    if (next < ac.currentTime - 0.05) next = ac.currentTime + 0.05;
     while (next < ac.currentTime + 0.25) {
       const bar = Math.floor(i / 8) % 4, pos = i % 8;
       const m = song.mel[i % 32];
       const at = next - ac.currentTime;
-      if (m) tone({ f: N(m), type: def.lead, dur: step * 0.9, vol: def.lead === 'sine' ? 0.16 : 0.07, at, dest: musicGain, attack: 0.01 });
-      if (pos % 2 === 0) tone({ f: N(song.bass[bar] + (pos === 4 ? 7 : 0)), type: 'triangle', dur: step * 1.7, vol: 0.22, at, dest: musicGain });
-      if (pos === 0 || pos === 4) song.chords[bar].forEach((c) => tone({ f: N(c), type: 'sine', dur: step * 3.5, vol: 0.035, at, dest: musicGain, attack: 0.03 }));
+      if (m) tone({ f: N(m), type: def.lead, dur: step * 0.9, vol: def.lead === 'sine' ? 0.16 : 0.07, at, dest: songGain, attack: 0.01 });
+      if (pos % 2 === 0) tone({ f: N(song.bass[bar] + (pos === 4 ? 7 : 0)), type: 'triangle', dur: step * 1.7, vol: 0.22, at, dest: songGain });
+      if (pos === 0 || pos === 4) song.chords[bar].forEach((c) => tone({ f: N(c), type: 'sine', dur: step * 3.5, vol: 0.035, at, dest: songGain, attack: 0.03 }));
       // drums
       if (def.perc === 'heavy') {
-        if (pos % 2 === 0) noise({ dur: 0.12, vol: 0.18, freq: 120, type: 'lowpass', at, dest: musicGain });
-        if (pos === 2 || pos === 6) noise({ dur: 0.1, vol: 0.14, freq: 1800, at, dest: musicGain });
+        if (pos % 2 === 0) noise({ dur: 0.12, vol: 0.18, freq: 120, type: 'lowpass', at, dest: songGain });
+        if (pos === 2 || pos === 6) noise({ dur: 0.1, vol: 0.14, freq: 1800, at, dest: songGain });
       } else if (def.perc === 'bongo') {
-        if (pos === 0 || pos === 3 || pos === 6) tone({ f: pos === 3 ? 260 : 190, f2: 120, type: 'sine', dur: 0.12, vol: 0.18, at, dest: musicGain });
-        noise({ dur: 0.03, vol: 0.04, freq: 7000, type: 'highpass', at, dest: musicGain });
+        if (pos === 0 || pos === 3 || pos === 6) tone({ f: pos === 3 ? 260 : 190, f2: 120, type: 'sine', dur: 0.12, vol: 0.18, at, dest: songGain });
+        noise({ dur: 0.03, vol: 0.04, freq: 7000, type: 'highpass', at, dest: songGain });
       } else {
-        if (pos === 0 || pos === 4) tone({ f: 120, f2: 50, type: 'sine', dur: 0.15, vol: 0.2, at, dest: musicGain });
-        if (pos === 2 || pos === 6) noise({ dur: 0.08, vol: 0.06, freq: 2500, at, dest: musicGain });
-        if (pos % 2 === 1) noise({ dur: 0.02, vol: 0.03, freq: 8000, type: 'highpass', at, dest: musicGain });
+        if (pos === 0 || pos === 4) tone({ f: 120, f2: 50, type: 'sine', dur: 0.15, vol: 0.2, at, dest: songGain });
+        if (pos === 2 || pos === 6) noise({ dur: 0.08, vol: 0.06, freq: 2500, at, dest: songGain });
+        if (pos % 2 === 1) noise({ dur: 0.02, vol: 0.03, freq: 8000, type: 'highpass', at, dest: songGain });
       }
       next += step; i++;
     }
   }, 60);
-  music = { name, timer };
+  music = { name, timer, gain: songGain };
 }
-export function stopMusic() { if (music) { clearInterval(music.timer); music = null; } }
+export function stopMusic() {
+  if (!music) return;
+  clearInterval(music.timer);
+  const g = music.gain;
+  if (g && ac) { g.gain.cancelScheduledValues(ac.currentTime); g.gain.setTargetAtTime(0, ac.currentTime, 0.02); setTimeout(() => g.disconnect(), 600); }
+  music = null;
+}
