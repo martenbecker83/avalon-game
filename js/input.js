@@ -37,12 +37,13 @@ export function initInput(onPause) {
   // Multi-touch buttons: track which button each touch is on
   const btns = [...document.querySelectorAll('.tbtn')];
   const active = new Map(); // touchId -> key
+  let stickJump = false;
   const refresh = () => {
     const on = new Set(active.values());
     for (const b of btns) {
       const k = b.dataset.k;
-      const v = on.has(k);
-      b.classList.toggle('on', v);
+      b.classList.toggle('on', on.has(k));
+      const v = on.has(k) || (k === 'jump' && stickJump);
       if (keys[k] !== v) set(k, v);
     }
   };
@@ -58,15 +59,21 @@ export function initInput(onPause) {
   const stick = document.getElementById('stick');
   const knob = document.getElementById('stick-knob');
   let stickId = null, stickCx = 0;
-  const stickMove = (x) => {
-    const max = stick.clientWidth * 0.34;
-    const dx = Math.max(-max, Math.min(max, x - stickCx));
-    knob.style.transform = `translate(${dx}px, 0)`;
-    const dead = max * 0.22;
+  let stickCy = 0;
+  // knop naar links/rechts = lopen, knop omhoog duwen = springen
+  const stickMove = (x, y) => {
+    const max = stick.clientWidth * 0.3;
+    let dx = x - stickCx, dy = y - stickCy;
+    const len = Math.hypot(dx, dy);
+    if (len > max) { dx = dx / len * max; dy = dy / len * max; }
+    knob.style.transform = `translate(${dx}px, ${dy}px)`;
+    const dead = max * 0.25;
     if (keys.left !== dx < -dead) set('left', dx < -dead);
     if (keys.right !== dx > dead) set('right', dx > dead);
+    const up = dy < -max * 0.5;
+    if (up !== stickJump) { stickJump = up; refresh(); }
   };
-  const stickEnd = () => { stickId = null; knob.style.transform = ''; set('left', false); set('right', false); stick.classList.remove('on'); };
+  const stickEnd = () => { stickId = null; knob.style.transform = ''; set('left', false); set('right', false); stickJump = false; refresh(); stick.classList.remove('on'); };
   const inStick = (x, y) => {
     const r = stick.getBoundingClientRect(); const pad = 70;
     return x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad;
@@ -77,10 +84,10 @@ export function initInput(onPause) {
     e.preventDefault();
     for (const t of e.changedTouches) {
       const end = e.type === 'touchend' || e.type === 'touchcancel';
-      if (t.identifier === stickId) { if (end) stickEnd(); else stickMove(t.clientX); continue; }
+      if (t.identifier === stickId) { if (end) stickEnd(); else stickMove(t.clientX, t.clientY); continue; }
       if (e.type === 'touchstart' && stickId === null && inStick(t.clientX, t.clientY)) {
-        stickId = t.identifier; const r = stick.getBoundingClientRect(); stickCx = r.left + r.width / 2;
-        stick.classList.add('on'); stickMove(t.clientX); continue;
+        stickId = t.identifier; const r = stick.getBoundingClientRect(); stickCx = r.left + r.width / 2; stickCy = r.top + r.height / 2;
+        stick.classList.add('on'); stickMove(t.clientX, t.clientY); continue;
       }
       if (end) active.delete(t.identifier);
       else { const k = hit(t.clientX, t.clientY); if (k) active.set(t.identifier, k); else active.delete(t.identifier); }
@@ -90,8 +97,8 @@ export function initInput(onPause) {
   for (const ev of ['touchstart', 'touchmove', 'touchend', 'touchcancel']) touchArea.addEventListener(ev, handle, { passive: false });
   // mouse fallback for the joystick (testing on a laptop)
   stick.addEventListener('mousedown', (e) => {
-    const r = stick.getBoundingClientRect(); stickCx = r.left + r.width / 2; stickId = 'mouse'; stickMove(e.clientX);
-    const mv = (ev) => stickMove(ev.clientX);
+    const r = stick.getBoundingClientRect(); stickCx = r.left + r.width / 2; stickCy = r.top + r.height / 2; stickId = 'mouse'; stickMove(e.clientX, e.clientY);
+    const mv = (ev) => stickMove(ev.clientX, ev.clientY);
     const up = () => { stickEnd(); window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up); };
     window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
   });

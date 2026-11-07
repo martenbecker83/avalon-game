@@ -17,9 +17,11 @@ Kies een van de acht personages, elk met een eigen superkracht, en speel door vi
 | Lolo | Hamer | Langzaam, klap op de grond die alle vijanden vlak naast hem raakt |
 | Lola | Pannenkoeken | Langzaam, korte pannenkoek-boemerang die twee keer raakt |
 
-## Levens en hartjes
+## Een spel
 
-Een spel (één wereld) begin je met 3 levens. Binnen een leven heb je 3 hartjes. Zijn je hartjes op, dan verlies je een leven en ga je terug naar het laatste checkpoint. Bij elk nieuw level krijg je je hartjes weer terug. Zijn je levens op, dan is het game over: je ziet je score, kunt hem registreren en de wereld begint weer bij level 1. Daarna kies je opnieuw een personage. Tijdens een spel kun je niet van personage wisselen.
+Je kiest één personage en speelt daarmee het hele spel. Je hebt 3 levens voor alle vier de werelden samen, en binnen een leven 3 hartjes. Zijn je hartjes op, dan verlies je een leven en ga je terug naar het laatste checkpoint. Bij elk nieuw level krijg je je hartjes terug.
+
+Je kiest zelf welke wereld je speelt, maar je blijft in die wereld tot je hem hebt uitgespeeld. Daarna kies je de volgende. Uitgespeelde werelden krijgen een sticker. Het spel is afgelopen als je alle vier de werelden hebt uitgespeeld, als je levens op zijn (game over) of als je stopt via de pauzeknop. Je score wordt dan altijd geregistreerd en je ziet meteen het scorebord, met jouw nieuwe score gemarkeerd.
 
 ## Munten
 
@@ -32,12 +34,12 @@ Een spel (één wereld) begin je met 3 levens. Binnen een leven heb je 3 hartjes
 ## Besturing
 
 - **Laptop:** pijltjes of A/D lopen, spatie of pijl omhoog springen, X of J aanvallen, Esc pauze
-- **iPad:** joystick links om te lopen, knoppen rechts om aan te vallen en te springen (speel met het scherm liggend). Zet de game via Delen > Zet op beginscherm als app op je iPad.
+- **iPad:** joystick links om te lopen (omhoog duwen is springen), knoppen rechts om aan te vallen en te springen (speel met het scherm liggend). Zet de game via Delen > Zet op beginscherm als app op je iPad.
 - In de Lucht-wereld kun je dubbel springen, onderwater kun je zwemmen door steeds op springen te drukken.
 
 ## Scores
 
-Na een uitgespeelde wereld (of als je stopt en je score registreert) typ je je initialen in. De score komt op het algemene scorebord voor iedereen, en op de lijst van je eigen apparaat. Voortgang per wereld wordt op het apparaat bewaard, zodat je later verder kunt spelen.
+Aan het eind van een spel typ je je initialen in. Het scorebord toont de top 10, met per score het personage, de stickers van de uitgespeelde werelden en de datum. Er is een lijst voor iedereen en een lijst van je eigen apparaat. Een lopend spel wordt op het apparaat bewaard, zodat je later verder kunt spelen.
 
 ## Techniek
 

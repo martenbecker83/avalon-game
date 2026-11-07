@@ -1,28 +1,43 @@
 // Menu's, schermen en de spel-lus
+//
+// Eén spel = één personage, 3 levens en vier werelden. Je kiest een wereld, blijft daarin tot hij
+// uitgespeeld is en kiest dan de volgende. Het spel eindigt als alle werelden uitgespeeld zijn,
+// als je levens op zijn (game over) of als je stopt. De score wordt dan altijd geregistreerd.
 import { CHARACTERS, charById, renderPortrait, drawCharacter } from './characters.js';
-import { WORLDS, LEVELS_PER_WORLD, GROUND_Y } from './worlds.js';
+import { WORLDS } from './worlds.js';
 import { drawWorldPreview, drawBackground, drawGround } from './art.js';
 import { Game } from './game.js';
 import { initInput, isTouch, clearPressed } from './input.js';
-import { initAudio, setMusic, setSfx, sfx, playMusic, stopMusic } from './audio.js';
+import { initAudio, setMusic, setSfx, sfx, playMusic } from './audio.js';
 import * as store from './storage.js';
 
 const $ = (s) => document.querySelector(s);
 const canvas = $('#game');
 const settings = store.getSettings();
 let selectedChar = charById(settings.character);
-let currentWorld = null;
-let runChar = selectedChar; // het personage van het lopende spel (kan niet wisselen tijdens een spel)
-let mode = 'menu'; // menu | play
+let run = store.getRun();        // het lopende spel (of null)
+let currentWorld = run?.current ? WORLDS.find((w) => w.id === run.current.world) : null;
+let mode = 'menu';               // menu | play
+let highlightId = null;          // nieuwe score die in het scorebord oplicht
+let lastPosted = null;           // antwoord van de server op de laatste score (met plek)
 
 setMusic(settings.music); setSfx(settings.sfx);
+
+export const MEDALS = {
+  jungle: { icon: '🌴', label: 'Oerwoud' },
+  clouds: { icon: '☁️', label: 'Paarse Wolken' },
+  water: { icon: '🐠', label: 'Onderwater' },
+  sky: { icon: '🐉', label: 'Lucht' },
+};
+const runChar = () => charById(run?.char || selectedChar.id);
+const saveRun = () => { if (run) store.setRun(run); };
 
 // ---------- game hooks ----------
 let bannerTimer = null;
 const game = new Game(canvas, {
   onHud({ hearts, max, lives, coins, label }) {
-    $('#hud-life-count').textContent = `×${lives}`;
     $('#hud-hearts').innerHTML = Array.from({ length: max }, (_, i) => `<svg class="h ${i < hearts ? '' : 'empty'}" viewBox="0 0 32 30"><path d="M16 28C4 19 1 13 1 8.5 1 4.4 4.3 1 8.5 1c3 0 5.6 1.8 7.5 4.6C17.9 2.8 20.5 1 23.5 1 27.7 1 31 4.4 31 8.5 31 13 28 19 16 28z"/></svg>`).join('');
+    $('#hud-life-count').textContent = `×${lives}`;
     $('#hud-coin-count').textContent = coins;
     $('#hud-level').textContent = label;
   },
@@ -38,29 +53,33 @@ const game = new Game(canvas, {
     if (!name) { bar.classList.add('hidden'); return; }
     bar.classList.remove('hidden'); $('#boss-name').textContent = name; $('#boss-fill').style.width = `${Math.round(frac * 100)}%`;
   },
-  onCheckpoint({ level, checkpoint, coins, lives }) { saveProgress({ level, checkpoint, coins, lives }); },
-  onLifeLost({ level, checkpoint, coins, lives }) { saveProgress({ level, checkpoint, coins, lives }); },
+  onCheckpoint({ level, checkpoint, coins, lives }) { if (!run) return; run.current = { world: currentWorld.id, level, checkpoint }; run.coins = coins; run.lives = lives; saveRun(); },
+  onLifeLost({ level, checkpoint, coins, lives }) { if (!run) return; run.current = { world: currentWorld.id, level, checkpoint }; run.coins = coins; run.lives = lives; saveRun(); },
   onLevelComplete({ level, coins, lives }) {
-    const next = level + 1;
-    saveProgress({ level: next, checkpoint: 0, coins, lives });
-    startLevel(next, 0, coins, lives); // nieuw level: hartjes weer vol
+    run.current = { world: currentWorld.id, level: level + 1, checkpoint: 0 }; run.coins = coins; run.lives = lives; saveRun();
+    startLevel(level + 1, 0); // nieuw level: hartjes weer vol
   },
-  onGameOver({ coins }) {
-    store.clearProgress(currentWorld.id); // na game over begin je weer bij 0
-    showScoreEntry(coins, 'gameover');
+  onWorldComplete({ coins, lives }) {
+    if (!run.completed.includes(currentWorld.id)) run.completed.push(currentWorld.id);
+    run.coins = coins; run.lives = lives; run.current = null; saveRun();
+    leaveGame();
+    if (run.completed.length >= WORLDS.length) { endRun('won'); return; }
+    show('worlds');
+    modal(`<h2>${esc(currentWorld.name)} uitgespeeld!</h2>
+      <div class="medal-row big">${medalsHtml(run.completed)}</div>
+      <p>Je hebt de mensen bevrijd. Kies je volgende wereld!</p>
+      <div class="menu"><button class="big-btn" data-act="ok">Verder</button></div>`, () => closeModal());
   },
-  onWorldComplete({ coins }) {
-    const prog = store.getProgress(currentWorld.id) || {};
-    store.setProgress(currentWorld.id, { level: 1, checkpoint: 0, coins: 0, lives: 3, active: false, freed: true, best: Math.max(prog.best || 0, coins) });
-    showScoreEntry(coins, 'won');
-  },
+  onGameOver({ coins }) { if (run) run.coins = coins; endRun('gameover'); },
 });
 
 function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
-function saveProgress({ level, checkpoint, coins, lives }) {
-  const old = store.getProgress(currentWorld.id) || {};
-  store.setProgress(currentWorld.id, { ...old, level, checkpoint, coins, lives: lives ?? old.lives ?? 3, char: runChar.id, active: true });
+function medalsHtml(done, all = true) {
+  return WORLDS.filter((w) => all || done.includes(w.id)).map((w) => {
+    const got = done.includes(w.id);
+    return `<span class="medal m-${w.id} ${got ? 'got' : ''}" title="${MEDALS[w.id].label}${got ? ' uitgespeeld' : ''}">${MEDALS[w.id].icon}</span>`;
+  }).join('');
 }
 
 // ---------- screens ----------
@@ -68,13 +87,41 @@ function show(id) {
   document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('hidden', s.id !== `scr-${id}`));
   if (id === 'chars') buildChars();
   if (id === 'worlds') buildWorlds();
-  if (id === 'scores') buildScores('global');
+  if (id === 'scores') buildScores(highlightTab || 'global');
 }
 function hideScreens() { document.querySelectorAll('.screen').forEach((s) => s.classList.add('hidden')); }
 
-document.querySelectorAll('[data-back]').forEach((b) => b.addEventListener('click', () => { sfx.click(); show(b.dataset.back); }));
-$('#btn-play').addEventListener('click', () => { initAudio(); playMusic('title'); sfx.click(); show('chars'); });
-$('#btn-scores').addEventListener('click', () => { initAudio(); sfx.click(); show('scores'); });
+document.querySelectorAll('[data-back]').forEach((b) => b.addEventListener('click', () => {
+  sfx.click();
+  if (b.dataset.back === 'chars' && run) show('title'); else show(b.dataset.back);
+}));
+
+$('#btn-play').addEventListener('click', () => {
+  initAudio(); playMusic('title'); sfx.click();
+  if (!run) { show('chars'); return; }
+  const c = runChar();
+  modal(`
+    <h2>Je spel loopt nog</h2>
+    <canvas class="modal-portrait small" id="mp"></canvas>
+    <p>Met <b>${esc(c.name)}</b>, <b>${run.coins} munten</b> en <b>${run.lives} ${run.lives === 1 ? 'leven' : 'levens'}</b>.</p>
+    <div class="medal-row">${medalsHtml(run.completed)}</div>
+    <div class="menu">
+      <button class="big-btn" data-act="continue">Verder spelen</button>
+      <button class="big-btn alt" data-act="new">Nieuw spel</button>
+    </div>`, (act) => {
+    if (act === 'continue') { closeModal(); resumeRun(); }
+    if (act === 'new') {
+      modal(`<h2>Nieuw spel?</h2><p>Je huidige spel stopt en je score van <b>${run.coins} munten</b> wordt geregistreerd.</p>
+        <div class="menu"><button class="big-btn" data-act="yes">Ja, stoppen</button><button class="big-btn alt" data-act="no">Nee, terug</button></div>`, (a2) => {
+        closeModal();
+        if (a2 === 'yes') endRun('stop');
+      });
+    }
+  });
+  renderPortrait($('#mp'), c, { w: 80, h: 80 });
+});
+$('#btn-scores').addEventListener('click', () => { initAudio(); sfx.click(); highlightId = null; highlightTab = null; show('scores'); });
+
 const musicBtn = $('#btn-music'), sfxBtn = $('#btn-sfx');
 const paintSound = () => {
   musicBtn.textContent = settings.music ? '🎵 Muziek aan' : '🎵 Muziek uit';
@@ -92,16 +139,16 @@ sfxBtn.addEventListener('click', () => {
   sfx.click();
 });
 
-// characters
+// ---------- characters ----------
 function buildChars() {
   const grid = $('#char-grid');
   grid.innerHTML = '';
   for (const c of CHARACTERS) {
     const card = document.createElement('button');
     card.className = 'card' + (c.id === selectedChar.id ? ' selected' : '');
-    card.innerHTML = `<canvas></canvas><div class="c-name">${c.name}</div><div class="c-weapon">${c.weapon}</div>`;
+    card.innerHTML = `<canvas></canvas><div class="c-name">${c.name}</div>`;
     card.addEventListener('click', () => {
-      if (selectedChar.id === c.id) { goWorlds(); return; }
+      if (selectedChar.id === c.id) { startRun(); return; }
       selectedChar = c; store.setSettings({ character: c.id });
       grid.querySelectorAll('.card').forEach((el) => el.classList.remove('selected'));
       card.classList.add('selected'); sfx.click(); paintDetail();
@@ -116,8 +163,8 @@ function paintDetail() {
   const bar = (v) => `<span class="stat-bar"><i style="width:${v * 20}%"></i></span>`;
   $('#char-detail').innerHTML = `
     <div class="power">
-      <h3>${c.name} · ${c.weapon}</h3>
-      <div class="power-tag">Superkracht: ${c.power}</div>
+      <h3>${c.name}</h3>
+      <div class="power-tag">Superkracht: ${c.power} (${c.weapon.toLowerCase()})</div>
       <p>${c.desc}</p>
     </div>
     <div class="stats">
@@ -126,103 +173,91 @@ function paintDetail() {
       <span>Snelheid</span>${bar(c.stats.snelheid)}
     </div>
     <button class="big-btn" id="btn-choose">Kies ${c.name}</button>`;
-  $('#btn-choose').addEventListener('click', goWorlds);
+  $('#btn-choose').addEventListener('click', startRun);
 }
-function goWorlds() { sfx.click(); show('worlds'); }
 
-// worlds
+// ---------- run ----------
+function startRun() {
+  sfx.click();
+  run = { char: selectedChar.id, lives: 3, coins: 0, completed: [], current: null, started: new Date().toISOString() };
+  saveRun();
+  show('worlds');
+}
+function resumeRun() {
+  if (run.current) {
+    currentWorld = WORLDS.find((w) => w.id === run.current.world);
+    startLevel(run.current.level, run.current.checkpoint);
+  } else show('worlds');
+}
+
+// ---------- worlds ----------
 function buildWorlds() {
   const grid = $('#world-grid');
   grid.innerHTML = '';
+  const done = run?.completed || [];
+  const c = runChar();
+  $('#world-sub').innerHTML = run ? `Je speelt met <b>${esc(c.name)}</b> · ${run.coins} munten · ${run.lives} ${run.lives === 1 ? 'leven' : 'levens'}` : '';
   WORLDS.forEach((w, idx) => {
-    const prog = store.getProgress(w.id);
+    const got = done.includes(w.id);
     const card = document.createElement('button');
-    card.className = 'card world-card';
-    const lvl = prog?.active ? prog.level : 0;
-    const dots = Array.from({ length: LEVELS_PER_WORLD }, (_, i) => `<i class="${i + 1 < lvl ? 'done' : ''} ${i === LEVELS_PER_WORLD - 1 ? 'boss' : ''}"></i>`).join('');
-    const pc = prog?.char ? charById(prog.char).name : '';
-    const status = prog?.active ? `Bezig met ${pc}: level ${prog.level} · ${prog.coins} munten · ${prog.lives ?? 3} ${(prog.lives ?? 3) === 1 ? 'leven' : 'levens'}` : (prog?.freed ? 'Uitgespeeld! Speel nog eens voor een hogere score' : w.blurb);
-    card.innerHTML = `<canvas></canvas>${prog?.freed ? '<span class="w-badge">★ Mensen bevrijd</span>' : ''}<div class="w-info"><div class="w-name">${w.name}</div><div class="w-prog">${status}</div><div class="dots">${dots}</div></div>`;
-    card.addEventListener('click', () => { sfx.click(); chooseWorld(idx); });
+    card.className = 'card world-card' + (got ? ' done' : '');
+    card.innerHTML = `<canvas></canvas>${got ? `<span class="w-badge">${MEDALS[w.id].icon} Uitgespeeld</span>` : ''}<div class="w-info"><div class="w-name">${w.name}</div><div class="w-prog">${got ? 'De mensen zijn bevrijd!' : w.blurb}</div></div>`;
+    card.addEventListener('click', () => {
+      if (got) { sfx.click(); game.hooks.onBanner('Al uitgespeeld!', 'Kies een andere wereld', 1400); return; }
+      sfx.click(); chooseWorld(idx);
+    });
     grid.appendChild(card);
     requestAnimationFrame(() => drawWorldPreview(card.querySelector('canvas'), w.id));
   });
 }
-
 function chooseWorld(idx) {
   currentWorld = WORLDS[idx];
-  const prog = store.getProgress(currentWorld.id);
-  if (prog?.active && (prog.level > 1 || prog.checkpoint > 0 || prog.coins > 0)) {
-    const pc = charById(prog.char || selectedChar.id);
-    const lives = prog.lives ?? 3;
-    modal(`
-      <h2>${currentWorld.name}</h2>
-      <canvas class="modal-portrait" id="mp"></canvas>
-      <p>Je was met <b>${pc.name}</b> bij <b>level ${prog.level}</b>${prog.checkpoint ? `, checkpoint ${prog.checkpoint}` : ''}, met <b>${prog.coins} munten</b> en <b>${lives} ${lives === 1 ? 'leven' : 'levens'}</b>.</p>
-      <div class="menu">
-        <button class="big-btn" data-act="continue">Verder spelen met ${pc.name}</button>
-        <button class="big-btn alt" data-act="restart">Opnieuw beginnen met ${selectedChar.name}</button>
-        <button class="big-btn alt small" data-act="cancel">Terug</button>
-      </div>`, (act) => {
-      if (act === 'continue') { closeModal(); runChar = pc; startLevel(prog.level, prog.checkpoint, prog.coins, lives); }
-      if (act === 'restart') { closeModal(); store.clearProgress(currentWorld.id); runChar = selectedChar; saveProgress({ level: 1, checkpoint: 0, coins: 0, lives: 3 }); startLevel(1, 0, 0, 3); }
-      if (act === 'cancel') closeModal();
-    });
-    const mp = $('#mp'); if (mp) renderPortrait(mp, pc, { w: 110, h: 110 });
-  } else {
-    runChar = selectedChar;
-    saveProgress({ level: 1, checkpoint: 0, coins: 0, lives: 3 });
-    startLevel(1, 0, 0, 3);
-  }
+  run.current = { world: currentWorld.id, level: 1, checkpoint: 0 };
+  saveRun();
+  startLevel(1, 0);
 }
 
-function startLevel(level, checkpoint, coins, lives = 3) {
+function startLevel(level, checkpoint) {
   initAudio();
   mode = 'play';
+  closeModal();
   hideScreens();
+  $('#banner').classList.add('hidden');
   $('#hud').classList.remove('hidden');
   $('#touch').classList.toggle('hidden', !isTouch());
   clearPressed();
-  renderHead($('#hud-life-ico'), runChar, 30);
-  game.start({ worldIdx: WORLDS.indexOf(currentWorld), level, checkpoint, coins, lives, char: runChar });
+  const c = runChar();
+  renderHead($('#hud-life-ico'), c, 30);
+  game.start({ worldIdx: WORLDS.indexOf(currentWorld), level, checkpoint, coins: run.coins, lives: run.lives, char: c });
 }
 
 function leaveGame() {
   game.running = false; mode = 'menu';
-  $('#hud').classList.add('hidden'); $('#touch').classList.add('hidden'); $('#boss-bar').classList.add('hidden'); $('#banner').classList.add('hidden');
+  $('#hud').classList.add('hidden'); $('#touch').classList.add('hidden'); $('#boss-bar').classList.add('hidden');
   playMusic('title');
 }
 
-// pause
+// ---------- pause ----------
 function pause() {
-  if (mode !== 'play' || !game.running || $('#modal').classList.contains('hidden') === false) return;
+  if (mode !== 'play' || !game.running || !$('#modal').classList.contains('hidden')) return;
   game.paused = true; sfx.click();
-  const coins = game.coins;
   modal(`
     <h2>Pauze</h2>
-    <p>${currentWorld.name} · level ${game.level} · ${coins} munten</p>
+    <p>${esc(currentWorld.name)} · level ${game.level} · ${game.coins} munten</p>
     <div class="menu">
       <button class="big-btn" data-act="resume">Verder</button>
-      <button class="big-btn alt" data-act="later">Stoppen, later verder</button>
-      <button class="big-btn alt" data-act="score">Stoppen &amp; score registreren</button>
+      <button class="big-btn alt" data-act="stop">Stoppen</button>
     </div>`, (act) => {
     if (act === 'resume') { closeModal(); game.paused = false; clearPressed(); }
-    if (act === 'later') { closeModal(); leaveGame(); show('worlds'); }
-    if (act === 'score') {
-      modal(`<h2>Zeker weten?</h2><p>Je registreert ${game.coinsAtCp} munten (je stand bij het laatste checkpoint). Deze wereld begint daarna weer bij level 1.</p>
-        <div class="menu"><button class="big-btn" data-act="yes">Ja, score registreren</button><button class="big-btn alt" data-act="no">Nee, terug</button></div>`, (a2) => {
-        if (a2 === 'no') { closeModal(); pause2(); }
-        if (a2 === 'yes') {
-          const c = game.coinsAtCp;
-          const prog = store.getProgress(currentWorld.id) || {};
-          store.setProgress(currentWorld.id, { level: 1, checkpoint: 0, coins: 0, lives: 3, active: false, freed: !!prog.freed });
-          leaveGame(); showScoreEntry(c, 'stop');
-        }
+    if (act === 'stop') {
+      modal(`<h2>Stoppen?</h2><p>Je spel stopt en je score van <b>${game.coins} munten</b> wordt geregistreerd.</p>
+        <div class="menu"><button class="big-btn" data-act="yes">Ja, stoppen</button><button class="big-btn alt" data-act="no">Nee, verder spelen</button></div>`, (a2) => {
+        if (a2 === 'no') { closeModal(); game.paused = false; clearPressed(); }
+        if (a2 === 'yes') { run.coins = game.coins; endRun('stop'); }
       });
     }
   });
 }
-function pause2() { game.paused = false; pause(); }
 $('#btn-pause').addEventListener('click', pause);
 initInput(pause);
 
@@ -239,57 +274,63 @@ $('#modal').addEventListener('click', (e) => {
   if (b && modalHandler) { sfx.click(); modalHandler(b.dataset.act, b); }
 });
 
-// ---------- score entry ----------
-function showScoreEntry(score, kind) {
+// ---------- end of a run: always register the score ----------
+let highlightTab = null;
+function endRun(kind) {
+  const finished = run;
+  run = null; store.clearRun();
   leaveGame();
-  const won = kind === 'won', over = kind === 'gameover';
-  const after = () => show(over ? 'chars' : 'worlds');
+  hideScreens();
+  const c = charById(finished.char);
+  const score = finished.coins, done = finished.completed;
   let ini = (settings.initials || '').slice(0, 3).split('');
   const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  const title = kind === 'won' ? 'Alles uitgespeeld!' : kind === 'gameover' ? 'Game over' : 'Spel gestopt';
+  const sub = kind === 'won' ? 'Je hebt de mensen in alle vier de werelden bevrijd!' : kind === 'gameover' ? 'Je levens zijn op.' : '';
   const render = () => {
     const boxes = [0, 1, 2].map((i) => `<div class="ini-box ${i === ini.length ? 'active' : ''}">${ini[i] || ''}</div>`).join('');
     modal(`
-      <h2>${won ? 'Gewonnen!' : over ? 'Game over' : 'Score registreren'}</h2>
-      ${won ? `<p>Je hebt de mensen in <b>${currentWorld.name}</b> bevrijd met ${runChar.name}!</p>` : over ? `<p>Je levens zijn op. ${currentWorld.name} begint weer bij level 1.</p>` : `<p>${currentWorld.name} met ${runChar.name}</p>`}
+      <h2>${title}</h2>
+      ${sub ? `<p>${sub}</p>` : ''}
       <div class="score-head"><canvas class="modal-portrait small" id="mp"></canvas><div><div class="big-score">${score}</div><p>munten</p></div></div>
-      <p style="margin-bottom:4px">Typ je initialen:</p>
+      <div class="medal-row">${medalsHtml(done)}</div>
+      <p style="margin-bottom:4px">Typ je initialen voor het scorebord:</p>
       <div class="ini-boxes">${boxes}</div>
       <div class="keyboard">${letters.map((l) => `<button data-act="k" data-l="${l}">${l}</button>`).join('')}<button class="wide" data-act="del">⌫ Wis</button></div>
-      <div class="menu"><button class="big-btn" data-act="save" ${ini.length ? '' : 'disabled'}>Opslaan</button><button class="big-btn alt small" data-act="skip">Niet opslaan</button></div>
+      <div class="menu"><button class="big-btn" data-act="save" ${ini.length ? '' : 'disabled'}>Opslaan</button></div>
     `, async (act, btn) => {
       if (act === 'k' && ini.length < 3) { ini.push(btn.dataset.l); render(); }
       if (act === 'del') { ini.pop(); render(); }
-      if (act === 'skip') { closeModal(); after(); }
-      if (act === 'save' && ini.length) {
-        const initials = ini.join('');
-        settings.initials = initials; store.setSettings({ initials });
-        const entry = { initials, character: runChar.id, world: currentWorld.id, score, date: new Date().toISOString().slice(0, 10) };
-        store.addLocalScore(entry);
-        $('#modal-card').innerHTML = '<h2>Opslaan…</h2>';
-        let ok = true;
-        try { await store.postGlobalScore(entry); } catch { ok = false; }
-        modal(`<h2>${ok ? 'Opgeslagen!' : 'Bijna gelukt'}</h2><p>${ok ? 'Je score staat op het scorebord.' : 'Het algemene scorebord is nu niet bereikbaar. Je score is wel op dit apparaat bewaard.'}</p>
-          <div class="menu"><button class="big-btn" data-act="board">Bekijk scorebord</button><button class="big-btn alt" data-act="again">${over ? 'Kies een personage' : 'Verder spelen'}</button></div>`, (a) => {
-          closeModal();
-          if (a === 'board') show('scores'); else after();
-        });
-      }
+      if (act === 'save' && ini.length) save();
     });
-    const mp = $('#mp'); if (mp) renderPortrait(mp, runChar, { w: 80, h: 80 });
+    renderPortrait($('#mp'), c, { w: 80, h: 80 });
   };
-  render();
+  const save = async () => {
+    window.removeEventListener('keydown', onKey);
+    const initials = ini.join('');
+    settings.initials = initials; store.setSettings({ initials });
+    const entry = { id: Math.random().toString(36).slice(2, 12), initials, character: c.id, worlds: done, score, date: new Date().toISOString().slice(0, 10) };
+    store.addLocalScore(entry);
+    $('#modal-card').innerHTML = '<h2>Opslaan…</h2>';
+    let ok = true;
+    try { lastPosted = await store.postGlobalScore(entry); } catch { ok = false; lastPosted = null; }
+    closeModal();
+    highlightId = entry.id; highlightTab = ok ? 'global' : 'local';
+    show('scores');
+  };
   const onKey = (e) => {
-    if ($('#modal').classList.contains('hidden') || !$('.ini-boxes')) { window.removeEventListener('keydown', onKey); return; }
+    if (!$('.ini-boxes')) return;
     if (/^[a-z]$/i.test(e.key) && ini.length < 3) { ini.push(e.key.toUpperCase()); render(); }
     else if (e.key === 'Backspace') { ini.pop(); render(); }
-    else if (e.key === 'Enter' && ini.length) $('[data-act="save"]')?.click();
+    else if (e.key === 'Enter' && ini.length) save();
   };
   window.addEventListener('keydown', onKey);
+  render();
+  if (kind === 'won') sfx.victory();
 }
 
 // ---------- scoreboard ----------
 document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => {
-  document.querySelectorAll('.tab').forEach((x) => x.classList.toggle('active', x === t));
   sfx.click(); buildScores(t.dataset.tab);
 }));
 async function buildScores(tab) {
@@ -302,19 +343,31 @@ async function buildScores(tab) {
     try { rows = await store.fetchGlobalScores(); }
     catch { list.innerHTML = '<div class="empty">Het algemene scorebord is nu niet bereikbaar.<br>Bekijk je eigen scores bij "Op dit apparaat".</div>'; return; }
   }
-  if (!rows.length) { list.innerHTML = '<div class="empty">Nog geen scores. Speel een wereld en zet jouw naam bovenaan!</div>'; return; }
+  if (!rows.length) { list.innerHTML = '<div class="empty">Nog geen scores. Speel en zet jouw naam bovenaan!</div>'; return; }
   list.innerHTML = '';
-  rows.slice(0, 50).forEach((r, i) => {
+  const top = rows.slice(0, 10);
+  const mine = highlightId ? rows.findIndex((r) => r.id === highlightId) : -1;
+  const addRow = (r, i) => {
     const c = charById(r.character);
-    const w = WORLDS.find((x) => x.id === r.world);
+    const done = Array.isArray(r.worlds) ? r.worlds : (r.world ? [r.world] : []);
     const row = document.createElement('div');
-    row.className = `score-row ${i < 3 ? 'top' + (i + 1) : ''}`;
+    row.className = `score-row ${i < 3 ? 'top' + (i + 1) : ''} ${r.id && r.id === highlightId ? 'me' : ''}`;
     row.innerHTML = `<span class="rank">${i + 1}</span><span class="ini">${esc(r.initials)}</span>
-      <span class="who"><canvas title="${c.name}"></canvas><span>${w ? w.name : ''}<small>${esc(fmtDate(r.date))}</small></span></span>
+      <span class="who"><canvas title="${c.name}"></canvas><span><span class="medal-row mini">${medalsHtml(done)}</span><small>${esc(fmtDate(r.date))}</small></span></span>
       <span class="pts">${r.score}</span>`;
     list.appendChild(row);
     renderHead(row.querySelector('canvas'), c);
-  });
+    return row;
+  };
+  top.forEach(addRow);
+  let mineRow = mine >= 10 ? [rows[mine], mine] : null;
+  if (mine === -1 && tab === 'global' && lastPosted?.entry?.id === highlightId && lastPosted.rank > 10) mineRow = [lastPosted.entry, lastPosted.rank - 1];
+  if (mineRow) {
+    const sep = document.createElement('div'); sep.className = 'score-sep'; sep.textContent = 'Jouw score'; list.appendChild(sep);
+    addRow(mineRow[0], mineRow[1]);
+  }
+  const me = list.querySelector('.me');
+  if (me) { me.scrollIntoView({ block: 'center' }); if (mine >= 0 && mine < 10) sfx.levelUp(); }
 }
 function fmtDate(d) {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d || '');
@@ -327,7 +380,7 @@ function renderHead(cv, def, size = 40) {
   ctx.save();
   if (def.kind === 'cat') { ctx.translate(-8, 82); ctx.scale(1.6, 1.6); }
   else { const k = 155 / def.height; ctx.translate(20, 28 + def.height * 0.86 * k * 0.6); ctx.scale(k * 0.6, k * 0.6); }
-  drawCharacter(ctx, def, { t: 0.5, walk: 0, moving: false, air: false, atk: -1, noWeapon: true });
+  drawCharacter(ctx, def, { t: 0.5, walk: 0, moving: false, air: false, atk: -1, noWeapon: true, bust: true });
   ctx.restore();
 }
 
@@ -335,7 +388,6 @@ function renderHead(cv, def, size = 40) {
 let titleT = 0;
 function renderTitle(dt) {
   titleT += dt;
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const ctx = canvas.getContext('2d');
   const s = (canvas.height) / 540;
   const W = canvas.width / s, H = 540;
@@ -371,14 +423,13 @@ function checkRotate() {
 }
 
 // ---------- main loop ----------
-window.addEventListener('resize', () => { game.resize(); checkRotate(); if (mode === 'menu') game.resize(); });
+window.addEventListener('resize', () => { game.resize(); checkRotate(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && mode === 'play' && game.running && !game.paused) pause(); });
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   if (mode === 'play' && game.lv) {
-    // two half steps for smoother physics on fast motion
-    game.update(dt / 2); game.update(dt / 2);
+    game.update(dt / 2); game.update(dt / 2); // two half steps for smoother physics
     game.render();
   } else renderTitle(dt);
   requestAnimationFrame(frame);
@@ -391,4 +442,14 @@ checkRotate();
 window.addEventListener('pointerdown', () => { initAudio(); if (mode === 'menu') playMusic('title'); }, { once: true });
 
 // debug helpers (only via URL ?debug)
-if (location.search.includes('debug')) window.__avalon = { game, startLevel, WORLDS, setWorld: (i) => (currentWorld = WORLDS[i]), setChar: (id) => (runChar = selectedChar = charById(id)) };
+if (location.search.includes('debug')) {
+  window.__avalon = {
+    game, WORLDS, get run() { return run; },
+    play(worldIdx, charId, level = 1) {
+      selectedChar = charById(charId);
+      run = { char: charId, lives: 3, coins: 0, completed: [], current: null };
+      currentWorld = WORLDS[worldIdx]; run.current = { world: currentWorld.id, level, checkpoint: 0 };
+      startLevel(level, 0);
+    },
+  };
+}

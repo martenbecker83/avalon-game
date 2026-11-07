@@ -2,6 +2,12 @@
 const KEY_PROGRESS = 'avalon.progress.v1';
 const KEY_SCORES = 'avalon.scores.v1';
 const KEY_SETTINGS = 'avalon.settings.v1';
+const KEY_RUN = 'avalon.run.v1';
+
+// het lopende spel: { char, lives, coins, completed: [worldIds], current: { world, level, checkpoint } | null }
+export function getRun() { return read(KEY_RUN, null); }
+export function setRun(r) { write(KEY_RUN, r); }
+export function clearRun() { try { localStorage.removeItem(KEY_RUN); } catch { /* */ } }
 
 function read(key, fallback) {
   try { const v = JSON.parse(localStorage.getItem(key)); return v ?? fallback; } catch { return fallback; }

@@ -226,9 +226,9 @@ button { font-family: inherit; color: inherit; cursor: pointer; border: 0; }
 #hud-life-ico { width: 30px; height: 30px; border-radius: 50%; background: #e6f3fe; }
 
 /* ---------- joystick ---------- */
-#stick { position: relative; width: 170px; height: 110px; border-radius: 60px; background: rgba(255,255,255,.35); box-shadow: inset 0 3px 8px rgba(20,50,90,.25); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); touch-action: none; }
-#stick::before, #stick::after { content: '◀'; position: absolute; top: 50%; left: 14px; transform: translateY(-50%); color: rgba(20,50,90,.45); font-size: 22px; }
-#stick::after { content: '▶'; left: auto; right: 14px; }
+#stick { position: relative; width: 156px; height: 156px; border-radius: 50%; background: rgba(255,255,255,.35); box-shadow: inset 0 3px 8px rgba(20,50,90,.25); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); touch-action: none; }
+#stick::before { content: '◀            ▶'; white-space: pre; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: rgba(20,50,90,.45); font-size: 20px; }
+#stick::after { content: '▲'; position: absolute; top: 8px; left: 50%; transform: translateX(-50%); color: rgba(40,140,50,.7); font-size: 20px; }
 #stick-knob { position: absolute; left: 50%; top: 50%; width: 76px; height: 76px; margin: -38px 0 0 -38px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #dde8f3); box-shadow: 0 5px 0 rgba(20,50,90,.25), 0 8px 16px rgba(20,50,90,.2); transition: transform .08s; }
 #stick.on #stick-knob { transition: none; }
 
@@ -240,3 +240,54 @@ button { font-family: inherit; color: inherit; cursor: pointer; border: 0; }
 .ini-box { width: 62px; height: 70px; font-size: 44px; }
 .modal-card h2 { font-size: 30px; }
 @media (max-height: 720px) { .modal-card { padding: 14px 20px; } .modal-card p { margin-bottom: 8px; font-size: 17px; } .big-score { font-size: 44px; } }
+
+/* ---------- werelden passen op één scherm ---------- */
+#scr-worlds { height: 100%; overflow: hidden; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+#scr-worlds .scr-head { flex: none; margin-bottom: 10px; }
+.scr-sub { color: #fff; font-weight: 700; font-size: 17px; text-shadow: 0 1px 4px rgba(0,40,90,.5); }
+#scr-worlds .world-grid { flex: 1 1 auto; min-height: 0; grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 12px; }
+#scr-worlds .world-card { display: flex; flex-direction: column; min-height: 0; }
+#scr-worlds .world-card canvas { flex: 1 1 auto; min-height: 0; aspect-ratio: auto; height: 100%; }
+#scr-worlds .world-card .w-info { flex: none; padding: 6px 14px 10px; }
+#scr-worlds .world-card .w-name { font-size: clamp(20px, 3vh, 26px); }
+.world-card.done { opacity: .75; }
+.world-card.done canvas { filter: saturate(.5); }
+@media (max-width: 640px) { #scr-worlds { overflow-y: auto; height: auto; min-height: 100%; } #scr-worlds .world-grid { grid-template-rows: none; } #scr-worlds .world-card canvas { height: 150px; } }
+
+/* ---------- vaste hoogte voor de personage-info ---------- */
+#scr-chars .char-detail { height: 122px; overflow: hidden; flex-wrap: nowrap; }
+#scr-chars .char-detail .power { min-width: 0; }
+#scr-chars .char-detail p { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+#scr-chars .char-detail .stats { flex: none; min-width: 190px; }
+#scr-chars .char-detail .big-btn { flex: none; }
+@media (max-width: 860px) {
+  #scr-chars .char-detail { height: 170px; flex-wrap: wrap; align-content: flex-start; }
+  #scr-chars .char-detail .power { flex: 1 1 100%; }
+  #scr-chars .char-detail .stats { min-width: 0; flex: 1 1 auto; }
+}
+
+/* ---------- medailles / stickers ---------- */
+.medal-row { display: flex; gap: 8px; justify-content: center; margin: 6px 0 10px; }
+.medal { width: 40px; height: 40px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 22px;
+  background: #eef2f6; border: 3px dashed #cfd8e2; filter: grayscale(1); opacity: .45; }
+.medal.got { filter: none; opacity: 1; border: 3px solid #fff; box-shadow: 0 0 0 3px var(--mc), 0 3px 6px rgba(0,0,0,.25); background: radial-gradient(circle at 35% 30%, #fff, var(--mc2)); transform: rotate(-8deg); }
+.m-jungle { --mc: #2fae3b; --mc2: #b9f0a0; } .m-clouds { --mc: #8a5bd6; --mc2: #e3cdfa; } .m-water { --mc: #1d8fc4; --mc2: #b6e6fb; } .m-sky { --mc: #e2553b; --mc2: #ffd2c4; }
+.medal-row.big .medal { width: 56px; height: 56px; font-size: 30px; }
+.medal-row.mini { justify-content: flex-start; gap: 4px; margin: 0 0 2px; }
+.medal-row.mini .medal { width: 24px; height: 24px; font-size: 13px; border-width: 2px; }
+.medal-row.mini .medal:not(.got) { display: none; }
+.medal-row.mini .medal.got { box-shadow: 0 0 0 2px var(--mc); }
+
+/* ---------- scorebord: eigen score ---------- */
+.score-row.me { background: linear-gradient(90deg, #fff3b0, #ffe680) !important; box-shadow: 0 0 0 3px #ffc531; animation: glow 1.2s ease-in-out infinite alternate; }
+@keyframes glow { to { box-shadow: 0 0 0 3px #ffc531, 0 0 18px 4px rgba(255,197,49,.7); } }
+.score-sep { text-align: center; font-weight: 800; color: var(--ink-soft); padding: 6px 0 2px; }
+.score-list { max-height: calc(100vh - 170px); overflow-y: auto; }
+.round-btn.home { display: inline-flex; align-items: center; justify-content: center; }
+@media (max-height: 820px) {
+  .score-row { padding: 2px 10px; font-size: 17px; }
+  .score-row .who canvas { width: 34px; height: 34px; }
+  .score-row .ini { font-size: 22px; }
+  .score-row .pts { font-size: 21px; }
+  .score-list { max-height: calc(100vh - 150px); }
+}

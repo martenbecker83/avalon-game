@@ -232,7 +232,12 @@ export class Game {
     if (p.y > GROUND_Y + 320) {
       this.hurt(true);
       if (this.p.hearts > 0) {
-        p.x = p.safe.x - p.dir * 10; p.y = p.safe.y - 2; p.vx = 0; p.vy = 0;
+        // start een stukje terug van de rand, zodat je niet meteen weer valt
+        const back = Math.sign(p.vx) || p.dir;
+        const g = this.lv.grounds.find((gg) => p.safe.x >= gg.x - 2 && p.safe.x <= gg.x + gg.w + 2);
+        let nx = p.safe.x - back * 110, ny = p.safe.y;
+        if (g) { nx = clamp(nx, g.x + 30, g.x + g.w - 30); ny = g.y; }
+        p.x = nx; p.y = ny - 2; p.vx = 0; p.vy = 0; p.dir = back;
       }
     }
 
@@ -815,7 +820,7 @@ export class Game {
     }
     if (this.phase === 'freed' && this.phaseT > 5.5) {
       this.phase = 'done'; this.running = false;
-      this.hooks.onWorldComplete({ coins: this.coins });
+      this.hooks.onWorldComplete({ coins: this.coins, lives: this.lives });
     }
   }
 
