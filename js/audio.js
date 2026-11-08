@@ -26,9 +26,21 @@ let others = null;
 try { others = new BroadcastChannel('avalon-audio'); } catch { /* oude browser */ }
 function claim() { try { others?.postMessage({ t: 'claim', id: me }); } catch { /* niets */ } }
 if (others) others.onmessage = (e) => {
-  if (e.data?.t !== 'claim' || e.data.id === me) return;
+  if (e.data?.id === me) return;
+  if (e.data?.t === 'ping') { others.postMessage({ t: 'pong', id: me, to: e.data.id, music: !!music }); return; }
+  if (e.data?.t === 'pong' && e.data.to === me) { pongs?.add(e.data.id); return; }
+  if (e.data?.t !== 'claim') return;
   stopMusic(); ac?.suspend?.();
 };
+// Hoe vaak staat het spel open (in deze browser / deze app)? Voor de melding in Instellingen
+let pongs = null;
+export async function countOpenGames() {
+  if (!others) return 1;
+  pongs = new Set();
+  others.postMessage({ t: 'ping', id: me });
+  await new Promise((r) => setTimeout(r, 350));
+  const n = pongs.size + 1; pongs = null; return n;
+}
 // Volume hard zetten: geleidelijk dempen (setTargetAtTime) werkt op iPad/Safari niet altijd
 function hardSet(param, v) {
   param.cancelScheduledValues(ac.currentTime);

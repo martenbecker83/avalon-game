@@ -12,7 +12,7 @@ import { drawWorldPreview, drawBackground, drawGround } from './art.js';
 import { Game, PLAYER_COLORS } from './game.js';
 import { createFinale } from './finale.js';
 import { initInput, isTouch, clearPressed, controllers, remote, pollInput, setInputMode, spatialNav, onPadConnected, connectedPads, checkPadCount, onPadCountChange } from './input.js';
-import { initAudio, setMusic, setSfx, sfx, playMusic, setSfxTap } from './audio.js';
+import { initAudio, setMusic, setSfx, sfx, playMusic, setSfxTap, countOpenGames } from './audio.js';
 import { Net } from './net.js';
 import * as store from './storage.js';
 
@@ -644,6 +644,7 @@ function openSettings(back = null) {
       ${row('🎵 Muziek', 'music', settings.music)}
       ${row('🔊 Geluidseffecten', 'sfx', settings.sfx)}
       ${inGame && isTouch() ? row('👆 Knoppen in beeld', 'buttons', buttonsOn) : ''}
+      <p id="open-games" class="hidden" style="font-size:.85em;color:#c0392b;margin:6px 0 0"></p>
       <div class="menu"><button class="big-btn" data-act="close">${back ? 'Terug' : inGame ? 'Verder spelen' : 'Klaar'}</button></div>`, (act) => {
       if (act === 'music') { toggleMusic(); render('music'); }
       if (act === 'sfx') { toggleSfx(); render('sfx'); }
@@ -655,6 +656,12 @@ function openSettings(back = null) {
       }
     });
     if (focusAct && connectedPads().length) requestAnimationFrame(() => $(`#modal-card [data-act="${focusAct}"]`)?.focus());
+    // staat het spel nog ergens anders open? Dan hoor je misschien ook die muziek
+    countOpenGames().then((n) => {
+      const el = $('#open-games'); if (!el || n < 2) return;
+      el.textContent = `⚠️ Het spel staat ${n}× open. Sluit de andere vensters, anders hoor je dubbele muziek.`;
+      el.classList.remove('hidden');
+    });
   };
   render();
 }
