@@ -169,7 +169,10 @@ export function pollInput(playing) {
   }
   pads.forEach((gp, i) => {
     const st = readPad(gp);
-    const slot = inputMode === 'local2' ? Math.min(i, 1) : 0;
+    // 2 spelers op één apparaat: twee controllers = elk een eigen speler. Met één controller op een iPad
+    // speelt speler 1 met touch en speler 2 met de controller; op een laptop speler 2 met de pijltjes.
+    let slot = 0;
+    if (inputMode === 'local2') slot = pads.length >= 2 ? Math.min(i, 1) : (isTouch() ? 1 : 0);
     or(merged[slot], st);
     const prev = padPrev.get(gp.index) || {};
     if (st.pause && !prev.pause) onPauseCb();

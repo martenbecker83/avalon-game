@@ -27,7 +27,7 @@ Je kiest zelf welke wereld je speelt, maar je blijft in die wereld tot je hem he
 
 Na **Spelen** kies je 1 of 2 spelers. Twee spelers kunnen niet hetzelfde personage kiezen en spelen samen in één beeld:
 
-- **Op dit apparaat:** met twee controllers (bijv. SteelSeries Nimbus), of samen op één toetsenbord.
+- **Op dit apparaat:** met twee controllers (bijv. SteelSeries Nimbus), of samen op één toetsenbord. Met één controller: op een iPad speelt speler 1 met touch en speler 2 met de controller; op een laptop speelt speler 1 met de controller (of A/D/W) en speler 2 met de pijltjes.
 - **Ieder op een eigen apparaat:** één speler maakt een spel en krijgt een code van 4 letters, de ander kiest *Meedoen* en tikt de code in. Zit op hetzelfde wifi-netwerk. Het apparaat van speler 1 rekent het spel uit en stuurt het beeld rechtstreeks naar speler 2.
 
 De achterste speler bepaalt waar het beeld is. Loopt de voorste vooruit, dan zoomt de camera uit, maar verder dan de rand van het beeld kan hij niet. De levens en munten zijn samen; ieder heeft eigen hartjes. Zijn de hartjes van één speler op, dan kost dat een leven en komt hij na een paar tellen terug naast de ander. Mini-bazen en eindbazen zijn met z'n tweeën wat sterker. Er is een apart scorebord voor 2 spelers, met beide personages en beide initialen.
