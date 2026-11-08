@@ -357,8 +357,12 @@ export function drawEnemy(ctx, e, t) {
   ctx.save(); ctx.translate(e.x, e.y);
   if (e.dir < 0) ctx.scale(-1, 1);
   if (e.flash > 0) ctx.filter = 'brightness(2.2)';
-  const squish = e.stun > 0 ? 0.85 : 1;
-  ctx.scale(1, squish);
+  const mood = (e.calm > 0 || e.stun > 0) ? e.mood : null;
+  if (mood === 'dance' && e.calm > 0) { ctx.translate(0, -Math.abs(Math.sin(tt * 7)) * 8); ctx.rotate(Math.sin(tt * 7) * 0.25); }
+  if (mood === 'sleep' && e.calm > 0) ctx.rotate(0.18);
+  if (mood === 'slip') ctx.rotate(Math.min(1, e.stun) * 3.2);
+  const squish = mood === 'flat' ? 0.45 : e.stun > 0 ? 0.85 : 1;
+  ctx.scale(mood === 'flat' ? 1.35 : 1, squish);
   if (e.type === 'spider' && e.homeY !== undefined) { ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(0, -26); ctx.lineTo(0, e.homeY - e.y - 150); ctx.stroke(); }
   switch (e.type) {
     case 'snake': {
@@ -501,14 +505,29 @@ export function drawEnemy(ctx, e, t) {
     default: drawEnemyMore(ctx, e, tt); break;
   }
   ctx.filter = 'none';
+  if (mood === 'dance' && e.calm > 0) {
+    ctx.fillStyle = ['#ff5fa2', '#7c5cff', '#2f9be0'][Math.floor(tt * 3) % 3]; ctx.font = '800 18px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('♪', Math.sin(tt * 3) * 14, -e.h - 14 - ((tt * 24) % 14));
+  } else if (mood === 'sleep' && e.calm > 0) {
+    ctx.fillStyle = '#ffffff'; ctx.strokeStyle = 'rgba(30,50,90,.6)'; ctx.lineWidth = 3; ctx.textAlign = 'center';
+    for (let i = 0; i < 3; i++) { const ph = ((tt * 0.8 + i / 3) % 1); ctx.globalAlpha = 1 - ph; ctx.font = `800 ${10 + ph * 10}px sans-serif`; ctx.strokeText('z', 8 + ph * 16, -e.h - 6 - ph * 30); ctx.fillText('z', 8 + ph * 16, -e.h - 6 - ph * 30); }
+    ctx.globalAlpha = 1;
+  } else if (e.calm > 0) {
   // betoverd door het strikje: blosjes en hartjes
-  if (e.calm > 0) {
     ctx.fillStyle = 'rgba(255,120,170,.55)'; ell(ctx, 6, -e.h * 0.55, 4, 2.5, null); ctx.fill();
     ctx.fillStyle = '#ff5fa2'; ctx.font = '800 14px sans-serif'; ctx.textAlign = 'center';
     ctx.globalAlpha = 0.6 + Math.sin(t * 6) * 0.4; ctx.fillText('♥', Math.sin(t * 2 + e.id) * 10, -e.h - 22 - ((t * 20) % 12)); ctx.globalAlpha = 1;
   }
-  // stun stars / pie splat
-  if (e.stun > 0) {
+  // stun stars / pie splat (of breiwol, boerwolk)
+  if (e.stun > 0 && mood === 'tangle') {
+    ctx.strokeStyle = '#ff7fb2'; ctx.lineWidth = 2.4;
+    for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.ellipse(0, -e.h * 0.5, e.w * 0.6, 5 + i * 2, i * 0.6 + Math.sin(tt) * 0.1, 0, Math.PI * 2); ctx.stroke(); }
+  } else if (e.stun > 0 && mood === 'burp') {
+    ctx.globalAlpha = 0.6; ell(ctx, 0, -e.h * 0.6, e.w * 0.6, e.h * 0.5, 'rgba(170,220,90,.7)'); ctx.globalAlpha = 1;
+    ctx.fillStyle = '#ffe04a'; for (let i = 0; i < 3; i++) { const a = t * 5 + i * 2.1; star(ctx, Math.cos(a) * 16, -e.h - 8 + Math.sin(a) * 4, 4); }
+  } else if (e.stun > 0 && (mood === 'flat' || mood === 'slip')) {
+    ctx.fillStyle = '#ffe04a'; for (let i = 0; i < 3; i++) { const a = t * 6 + i * 2.1; star(ctx, Math.cos(a) * 18, -e.h - 8 + Math.sin(a) * 5, 5); }
+  } else if (e.stun > 0) {
     ctx.fillStyle = '#f2e2b0'; ell(ctx, 18, -e.h * 0.8, 10, 8, null); ctx.fill();
     ctx.fillStyle = '#e9b665'; ell(ctx, 16, -e.h * 0.8 - 2, 5, 3, null); ctx.fill();
     ctx.fillStyle = '#ffe04a'; for (let i = 0; i < 3; i++) { const a = t * 5 + i * 2.1; star(ctx, Math.cos(a) * 16, -e.h - 8 + Math.sin(a) * 4, 4); }
@@ -1052,6 +1071,33 @@ export function drawProjectile(ctx, p, t) {
       ell(ctx, 0, 0, 12, 11, rg(ctx, 0, 0, 12, '#d8c8b0', '#7a5a42'));
       ctx.strokeStyle = '#5a3e2a'; ctx.lineWidth = 1.2;
       for (let i = 0; i < 9; i++) { const a = i * 0.7; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 6, Math.sin(a) * 6); ctx.quadraticCurveTo(Math.cos(a + 0.4) * 13, Math.sin(a + 0.4) * 13, Math.cos(a + 0.2) * 16, Math.sin(a + 0.2) * 15); ctx.stroke(); }
+      break;
+    }
+    case 'burp': {
+      // groene boerwolk
+      const k = p.age / p.life;
+      ctx.scale(p.dir || 1, 1); ctx.globalAlpha = Math.max(0, 1 - k);
+      for (let i = 0; i < 5; i++) ell(ctx, -20 + i * 12, Math.sin(i * 2 + t * 12) * 14, 22 + k * 20 - i * 2, 18 + k * 16 - i * 2, i % 2 ? 'rgba(180,225,95,.7)' : 'rgba(140,200,70,.6)');
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case 'yarn': {
+      // bol breiwol met een draadje erachter
+      ctx.rotate(p.rot || 0);
+      ell(ctx, 0, 0, 13, 13, rg(ctx, 0, 0, 13, '#ff9ec6', '#d6457f'));
+      ctx.strokeStyle = 'rgba(140,20,70,.65)'; ctx.lineWidth = 1.4;
+      for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.ellipse(0, 0, 12, 5 + i * 2, i * 0.8, 0, Math.PI * 2); ctx.stroke(); }
+      ctx.strokeStyle = '#ff8ab8'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(12, 0); ctx.quadraticCurveTo(22, 8, 30, 2); ctx.stroke();
+      ctx.fillStyle = '#c0c4cc'; ctx.save(); ctx.rotate(0.6); ctx.fillRect(-1, -20, 2, 18); ctx.rotate(-1.1); ctx.fillRect(-1, -20, 2, 18); ctx.restore();
+      break;
+    }
+    case 'peel': {
+      // bananenschil
+      ctx.rotate(p.rot || 0);
+      ctx.fillStyle = '#ffd93b'; ctx.strokeStyle = '#b88a10'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.ellipse(0, 0, 9, 5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      for (const a of [-2.6, -1.6, 0.9, 2.2]) { ctx.save(); ctx.rotate(a); ctx.beginPath(); ctx.ellipse(12, 0, 10, 4, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.restore(); }
+      ell(ctx, 0, -3, 3, 2, '#6b4a10');
       break;
     }
     case 'rice': ell(ctx, 0, 0, 3.4, 1.8, '#fffdf2', Math.atan2(p.vy, p.vx)); ctx.strokeStyle = 'rgba(160,150,120,.6)'; ctx.lineWidth = 0.6; ctx.stroke(); break;

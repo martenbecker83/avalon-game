@@ -12,6 +12,10 @@ export function initAudio() {
   musicGain = ac.createGain(); musicGain.gain.value = musicOn ? 0.32 : 0; musicGain.connect(master);
   sfxGain = ac.createGain(); sfxGain.gain.value = sfxOn ? 0.7 : 0; sfxGain.connect(master);
 }
+if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => {
+  if (!ac) return;
+  if (document.hidden) ac.suspend?.(); else ac.resume?.();
+});
 export function setMusic(on) {
   musicOn = on;
   if (musicGain) musicGain.gain.setTargetAtTime(on ? 0.32 : 0, ac.currentTime, 0.05);
@@ -61,6 +65,7 @@ export const sfx = {
   jump() { tone({ f: 320, f2: 640, type: 'square', dur: 0.14, vol: 0.12 }); },
   coin() { tone({ f: 988, type: 'square', dur: 0.08, vol: 0.12 }); tone({ f: 1319, type: 'square', dur: 0.22, vol: 0.12, at: 0.07 }); },
   token() { [784, 988, 1175, 1568].forEach((f, i) => tone({ f, type: 'triangle', dur: 0.18, vol: 0.2, at: i * 0.07 })); },
+  heartsFull() { [523, 659, 784, 1047, 1319].forEach((f, i) => { tone({ f, type: 'triangle', dur: 0.22, vol: 0.18, at: i * 0.07 }); tone({ f: f * 2, type: 'sine', dur: 0.15, vol: 0.05, at: i * 0.07 }); }); },
   heart() { [523, 659, 784].forEach((f, i) => tone({ f, type: 'sine', dur: 0.2, vol: 0.22, at: i * 0.08 })); },
   hit() { noise({ dur: 0.1, vol: 0.35, freq: 900, q: 0.8 }); tone({ f: 200, f2: 90, type: 'square', dur: 0.1, vol: 0.15 }); },
   enemyDie() { tone({ f: 600, f2: 120, type: 'sawtooth', dur: 0.25, vol: 0.12 }); noise({ dur: 0.15, vol: 0.2, freq: 2000 }); },
@@ -112,6 +117,28 @@ export const sfx = {
   },
   rice() { noise({ dur: 0.22, vol: 0.22, freq: 5000, q: 0.6, type: 'highpass' }); },
   bow() { [1319, 1568, 2093].forEach((f, i) => tone({ f, type: 'sine', dur: 0.2, vol: 0.12, at: i * 0.06 })); },
+  burp() {
+    // Papa's boer: lage, grommende zaagtand die wegzakt, met wat lucht erdoor
+    if (!ac) return;
+    const t = ac.currentTime;
+    const o = ac.createOscillator(); o.type = 'sawtooth';
+    o.frequency.setValueAtTime(95, t); o.frequency.linearRampToValueAtTime(120, t + 0.12); o.frequency.exponentialRampToValueAtTime(55, t + 0.7);
+    const lfo = ac.createOscillator(); lfo.frequency.value = 23; const lg = ac.createGain(); lg.gain.value = 18; lfo.connect(lg); lg.connect(o.frequency);
+    const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 700; f.Q.value = 4;
+    const g = ac.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.55, t + 0.05); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.75);
+    o.connect(f); f.connect(g); g.connect(sfxGain);
+    o.start(t); lfo.start(t); o.stop(t + 0.8); lfo.stop(t + 0.8);
+    noise({ dur: 0.5, vol: 0.1, freq: 400, type: 'lowpass' });
+  },
+  karaoke() { [659, 784, 880, 784, 1047, 988, 880].forEach((f, i) => { tone({ f, type: 'triangle', dur: 0.16, vol: 0.14, at: i * 0.13 }); tone({ f: f / 2, type: 'sine', dur: 0.16, vol: 0.08, at: i * 0.13 }); }); },
+  snore() {
+    // Opa snurkt: twee keer een brommend inademen en een fluitje
+    noise({ dur: 0.45, vol: 0.3, freq: 250, q: 3, type: 'bandpass' }); tone({ f: 70, f2: 90, type: 'sawtooth', dur: 0.45, vol: 0.1, curve: 'lin' });
+    tone({ f: 900, f2: 1400, type: 'sine', dur: 0.3, vol: 0.06, at: 0.55, curve: 'lin' });
+    noise({ dur: 0.45, vol: 0.3, freq: 250, q: 3, type: 'bandpass', at: 0.95 }); tone({ f: 70, f2: 90, type: 'sawtooth', dur: 0.45, vol: 0.1, at: 0.95, curve: 'lin' });
+  },
+  slip() { tone({ f: 300, f2: 1400, type: 'sine', dur: 0.25, vol: 0.18 }); tone({ f: 1400, f2: 200, type: 'sine', dur: 0.3, vol: 0.14, at: 0.25 }); },
+  boing() { tone({ f: 180, f2: 520, type: 'sine', dur: 0.12, vol: 0.3 }); tone({ f: 520, f2: 260, type: 'sine', dur: 0.35, vol: 0.2, at: 0.1 }); tone({ f: 1800, type: 'triangle', dur: 0.15, vol: 0.06 }); },
 };
 
 // Met een 'tap' kan het spel geluiden doorsturen naar de tweede speler (online samen spelen)
@@ -132,24 +159,49 @@ const SONGS = {
 
 function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
 
+// Een liedje van 8 maten. De melodie volgt de akkoorden: op de zware tellen altijd een akkoordtoon, daartussen
+// stapjes door de toonladder. (Vroeger negeerde de melodie de akkoorden, waardoor het klonk alsof er twee
+// liedjes tegelijk speelden.)
 function buildSong(def) {
   const r = rng(def.seed);
   const sc = def.scale, n = sc.length;
   const deg = (d) => def.root + sc[((d % n) + n) % n] + 12 * Math.floor(d / n);
-  // melody: 4 bars x 8 eighths, motif-based
-  const motif = [];
-  let d = 4 + Math.floor(r() * 3);
-  for (let i = 0; i < 8; i++) { motif.push(r() < 0.22 ? null : d); d += Math.floor(r() * 5) - 2; d = Math.max(2, Math.min(11, d)); }
+  const BARS = 8;
+  const chordOf = (bar) => def.prog[bar % def.prog.length];
+  const tones = (c) => { const t = []; for (let o = -1; o <= 2; o++) for (const k of [0, 2, 4]) t.push(c + k + o * n); return t; };
+  const LO = n + 1, HI = 2 * n + 3; // melodie blijft in een prettig bereik boven de akkoorden
+  // twee ritmes (8 achtsten per maat); tel 1 heeft altijd een noot
+  const rhythm = () => { const a = []; for (let i = 0; i < 8; i++) a.push(i === 0 || i === 4 ? true : r() < (i % 2 ? 0.45 : 0.7)); return a; };
+  const rA = rhythm(), rB = rhythm();
+  const order = [rA, rA, rB, rA, rA, rA, rB, [true, false, true, false, true, false, false, false]];
   const mel = [];
-  for (let bar = 0; bar < 4; bar++) {
-    const shift = def.prog[bar];
+  let d = n + 2 + Math.floor(r() * 3);
+  for (let bar = 0; bar < BARS; bar++) {
+    const c = chordOf(bar), ct = tones(c).filter((x) => x >= LO && x <= HI);
+    const rh = order[bar];
     for (let i = 0; i < 8; i++) {
-      let m = motif[i];
-      if (m !== null && bar % 2 === 1 && i > 4) m = m + (bar === 3 ? -1 : 1);
-      mel.push(m === null ? null : deg(m + (bar === 2 ? 2 : 0) + (shift > 4 ? 0 : 0)));
+      if (!rh[i]) { mel.push(null); continue; }
+      if (bar === BARS - 1 && i === 4) { // slot: terug naar de grondtoon
+        const home = [n, 2 * n].reduce((a, b) => (Math.abs(b - d) < Math.abs(a - d) ? b : a)); d = home; mel.push(deg(d)); continue;
+      }
+      if (i === 0 || i === 4) {
+        // zware tel: dichtstbijzijnde akkoordtoon (soms een sprongetje naar een andere)
+        const sorted = ct.slice().sort((a, b) => Math.abs(a - d) - Math.abs(b - d));
+        d = sorted[r() < 0.75 ? 0 : Math.min(1, sorted.length - 1)];
+      } else {
+        // lichte tel: stapje omhoog of omlaag; naar de volgende zware tel toe
+        const step = r() < 0.5 ? 1 : -1;
+        d = Math.max(LO, Math.min(HI, d + step));
+      }
+      mel.push(deg(d));
     }
   }
-  return { mel, bass: def.prog.map((p) => deg(p) - 24), chords: def.prog.map((p) => [deg(p), deg(p + 2), deg(p + 4)]) };
+  return {
+    bars: BARS, mel,
+    bass: Array.from({ length: BARS }, (_, b) => deg(chordOf(b)) - 24),
+    fifth: Array.from({ length: BARS }, (_, b) => deg(chordOf(b) + 4) - 24),
+    chords: Array.from({ length: BARS }, (_, b) => [deg(chordOf(b)), deg(chordOf(b) + 2), deg(chordOf(b) + 4)]),
+  };
 }
 
 export function playMusic(name) {
@@ -159,33 +211,38 @@ export function playMusic(name) {
   stopMusic();
   const def = SONGS[name] || SONGS.title;
   const song = buildSong(def);
-  const step = 60 / def.bpm / 2; // eighth notes
+  const step = 60 / def.bpm / 2; // achtsten
+  const total = song.bars * 8;
   // elk nummer krijgt een eigen volumeknop, zodat we het bij wisselen meteen helemaal kunnen dempen
   const songGain = ac.createGain(); songGain.gain.value = 1; songGain.connect(musicGain);
   let i = 0;
   let next = ac.currentTime + 0.1;
   const timer = setInterval(() => {
-    if (!ac || music?.timer !== timer) return;
+    if (!ac || music?.timer !== timer) { clearInterval(timer); return; }
+    if (ac.state !== 'running') return;
     // timers lopen soms achter (iPad, tabblad op de achtergrond): sla gemiste noten over in plaats van ze allemaal tegelijk af te spelen
     if (next < ac.currentTime - 0.05) next = ac.currentTime + 0.05;
     while (next < ac.currentTime + 0.25) {
-      const bar = Math.floor(i / 8) % 4, pos = i % 8;
-      const m = song.mel[i % 32];
+      const bar = Math.floor(i / 8) % song.bars, pos = i % 8;
+      const m = song.mel[i % total];
       const at = next - ac.currentTime;
-      if (m) tone({ f: N(m), type: def.lead, dur: step * 0.9, vol: def.lead === 'sine' ? 0.16 : 0.07, at, dest: songGain, attack: 0.01 });
-      if (pos % 2 === 0) tone({ f: N(song.bass[bar] + (pos === 4 ? 7 : 0)), type: 'triangle', dur: step * 1.7, vol: 0.22, at, dest: songGain });
-      if (pos === 0 || pos === 4) song.chords[bar].forEach((c) => tone({ f: N(c), type: 'sine', dur: step * 3.5, vol: 0.035, at, dest: songGain, attack: 0.03 }));
+      if (m) {
+        let len = 1; while (len < 3 && !song.mel[(i + len) % total] && (pos + len) % 4 !== 0) len++;
+        tone({ f: N(m), type: def.lead, dur: step * len * 0.85, vol: def.lead === 'sine' ? 0.14 : 0.055, at, dest: songGain, attack: 0.01 });
+      }
+      if (pos === 0 || pos === 4) tone({ f: N(pos === 0 ? song.bass[bar] : song.fifth[bar]), type: 'triangle', dur: step * 3.4, vol: 0.2, at, dest: songGain });
+      if (pos === 0) song.chords[bar].forEach((c) => tone({ f: N(c), type: 'sine', dur: step * 7.5, vol: 0.028, at, dest: songGain, attack: 0.04 }));
       // drums
       if (def.perc === 'heavy') {
-        if (pos % 2 === 0) noise({ dur: 0.12, vol: 0.18, freq: 120, type: 'lowpass', at, dest: songGain });
-        if (pos === 2 || pos === 6) noise({ dur: 0.1, vol: 0.14, freq: 1800, at, dest: songGain });
+        if (pos % 2 === 0) noise({ dur: 0.12, vol: 0.16, freq: 120, type: 'lowpass', at, dest: songGain });
+        if (pos === 2 || pos === 6) noise({ dur: 0.1, vol: 0.12, freq: 1800, at, dest: songGain });
       } else if (def.perc === 'bongo') {
-        if (pos === 0 || pos === 3 || pos === 6) tone({ f: pos === 3 ? 260 : 190, f2: 120, type: 'sine', dur: 0.12, vol: 0.18, at, dest: songGain });
-        noise({ dur: 0.03, vol: 0.04, freq: 7000, type: 'highpass', at, dest: songGain });
+        if (pos === 0 || pos === 3 || pos === 6) tone({ f: pos === 3 ? 260 : 190, f2: 120, type: 'sine', dur: 0.12, vol: 0.16, at, dest: songGain });
+        if (pos % 2 === 1) noise({ dur: 0.03, vol: 0.035, freq: 7000, type: 'highpass', at, dest: songGain });
       } else {
-        if (pos === 0 || pos === 4) tone({ f: 120, f2: 50, type: 'sine', dur: 0.15, vol: 0.2, at, dest: songGain });
-        if (pos === 2 || pos === 6) noise({ dur: 0.08, vol: 0.06, freq: 2500, at, dest: songGain });
-        if (pos % 2 === 1) noise({ dur: 0.02, vol: 0.03, freq: 8000, type: 'highpass', at, dest: songGain });
+        if (pos === 0 || pos === 4) tone({ f: 120, f2: 50, type: 'sine', dur: 0.15, vol: 0.18, at, dest: songGain });
+        if (pos === 2 || pos === 6) noise({ dur: 0.08, vol: 0.05, freq: 2500, at, dest: songGain });
+        if (pos % 2 === 1) noise({ dur: 0.02, vol: 0.025, freq: 8000, type: 'highpass', at, dest: songGain });
       }
       next += step; i++;
     }

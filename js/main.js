@@ -11,7 +11,7 @@ import { WORLDS } from './worlds.js';
 import { drawWorldPreview, drawBackground, drawGround } from './art.js';
 import { Game, PLAYER_COLORS } from './game.js';
 import { createFinale } from './finale.js';
-import { initInput, isTouch, clearPressed, controllers, remote, pollInput, setInputMode, spatialNav, onPadConnected, connectedPads } from './input.js';
+import { initInput, isTouch, clearPressed, controllers, remote, pollInput, setInputMode, spatialNav, onPadConnected, connectedPads, checkPadCount, onPadCountChange } from './input.js';
 import { initAudio, setMusic, setSfx, sfx, playMusic, setSfxTap } from './audio.js';
 import { Net } from './net.js';
 import * as store from './storage.js';
@@ -70,6 +70,12 @@ const hooks = {
     $('#hud-coin-count').textContent = coins;
     $('#hud-level').textContent = label;
   },
+  onRefill(missing) {
+    [$('#hud-hearts'), $('#hud-hearts2')].forEach((el, i) => {
+      if (!missing[i]) return;
+      el.classList.remove('refill'); void el.offsetWidth; el.classList.add('refill'); clearTimeout(el._rt); el._rt = setTimeout(() => el.classList.remove('refill'), 900);
+    });
+  },
   onCoin() { const el = $('#hud-coins'); el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); },
   onBanner(title, sub, ms = 1600) {
     const b = $('#banner');
@@ -86,7 +92,7 @@ const hooks = {
   onLifeLost({ level, checkpoint, coins, lives }) { if (!run) return; run.current = { world: currentWorld.id, level, checkpoint }; run.coins = coins; run.lives = lives; saveRun(); },
   onLevelComplete({ level, coins, lives }) {
     run.current = { world: currentWorld.id, level: level + 1, checkpoint: 0 }; run.coins = coins; run.lives = lives; saveRun();
-    startLevel(level + 1, 0); // nieuw level: hartjes weer vol
+    startLevel(level + 1, 0, true); // nieuw level: hartjes weer vol
   },
   onWorldComplete({ coins, lives }) {
     if (!run.completed.includes(currentWorld.id)) run.completed.push(currentWorld.id);
@@ -106,7 +112,7 @@ const hooks = {
   onGameOver({ coins }) { if (run) run.coins = coins; endRun('gameover'); },
 };
 // op het host-apparaat gaat alles wat in beeld komt ook naar de gast
-for (const k of ['onHud', 'onCoin', 'onBanner', 'onBossBar']) {
+for (const k of ['onHud', 'onCoin', 'onBanner', 'onBossBar', 'onRefill']) {
   const f = hooks[k];
   hooks[k] = (...a) => { f(...a); if (role === 'host' && mode === 'play') sendNet({ t: 'h', k, a }); };
 }
@@ -368,15 +374,15 @@ const paintSound = () => {
   musicBtn.classList.toggle('off', !settings.music); sfxBtn.classList.toggle('off', !settings.sfx);
 };
 paintSound();
-musicBtn.addEventListener('click', () => {
+function toggleMusic() {
   initAudio(); settings.music = !settings.music; setMusic(settings.music); store.setSettings({ music: settings.music }); paintSound();
-  if (settings.music) playMusic('title');
-  sfx.click();
-});
-sfxBtn.addEventListener('click', () => {
+  if (settings.music && mode !== 'play') playMusic('title');
+}
+function toggleSfx() {
   initAudio(); settings.sfx = !settings.sfx; setSfx(settings.sfx); store.setSettings({ sfx: settings.sfx }); paintSound();
-  sfx.click();
-});
+}
+musicBtn.addEventListener('click', () => { toggleMusic(); sfx.click(); });
+sfxBtn.addEventListener('click', () => { toggleSfx(); sfx.click(); });
 
 // ---------- characters ----------
 function takenBy(id) {
@@ -396,6 +402,12 @@ function buildChars() {
     card.className = 'card' + (c.id === selectedChar.id ? ' selected' : '') + (tb >= 0 ? ' taken' : '');
     card.innerHTML = `<canvas></canvas><div class="c-name">${c.name}</div>${tb >= 0 ? `<span class="taken-tag" style="--pc:${PLAYER_COLORS[tb]}">Speler ${tb + 1}</span>` : ''}${mine ? `<span class="pick-tag" style="--pc:${PLAYER_COLORS[party.slot]}">Gekozen</span>` : ''}`;
     if (tb >= 0) card.disabled = true;
+    card.addEventListener('focus', () => {
+      if (!document.body.classList.contains('padnav') || selectedChar.id === c.id || tb >= 0) return;
+      selectedChar = c; store.setSettings({ character: c.id });
+      grid.querySelectorAll('.card').forEach((el) => el.classList.remove('selected'));
+      card.classList.add('selected'); paintDetail();
+    });
     card.addEventListener('click', () => {
       if (selectedChar.id === c.id) { confirmPick(); return; }
       selectedChar = c; store.setSettings({ character: c.id });
@@ -406,6 +418,12 @@ function buildChars() {
     requestAnimationFrame(() => renderPortrait(card.querySelector('canvas'), c));
   }
   paintDetail();
+  padFocus(grid.querySelector('.card.selected'));
+}
+// met een controller staat de focus meteen op de juiste knop, zodat één druk op A genoeg is
+function padFocus(el) {
+  if (!el || !document.body.classList.contains('padnav') || !connectedPads().length) return;
+  requestAnimationFrame(() => { if ($('#modal').classList.contains('hidden')) el.focus(); });
 }
 function paintDetail() {
   const c = selectedChar;
@@ -468,8 +486,8 @@ function buildWorlds() {
   const cs = runChars();
   $('#world-sub').innerHTML = run ? `<span class="chip">${cs.map((c, i) => `<canvas class="chip-ico" data-i="${i}"></canvas>`).join('')}${cs.map((c) => esc(c.name)).join(' & ')}</span>
     <span class="chip"><span class="coin-ico">A</span>${run.coins}</span>
-    <span class="chip" title="levens"><canvas class="chip-ico" id="ws-life"></canvas>×${run.lives}</span>` : '';
-  if (run) { document.querySelectorAll('#world-sub canvas[data-i]').forEach((cv) => renderHead(cv, cs[+cv.dataset.i], 30)); renderHead($('#ws-life'), cs[0], 30); }
+    <span class="chip" title="levens">${cs.map((c, i) => `<canvas class="chip-ico" data-life="${i}"></canvas>`).join('')}×${run.lives}</span>` : '';
+  if (run) { document.querySelectorAll('#world-sub canvas[data-i]').forEach((cv) => renderHead(cv, cs[+cv.dataset.i], 30)); document.querySelectorAll('#world-sub canvas[data-life]').forEach((cv) => renderHead(cv, cs[+cv.dataset.life], 30)); }
   WORLDS.forEach((w, idx) => {
     const got = done.includes(w.id);
     const card = document.createElement('button');
@@ -482,6 +500,7 @@ function buildWorlds() {
     grid.appendChild(card);
     requestAnimationFrame(() => drawWorldPreview(card.querySelector('canvas'), w.id));
   });
+  padFocus(grid.querySelector('.world-card:not(.done)'));
 }
 function chooseWorld(idx) {
   currentWorld = WORLDS[idx];
@@ -490,11 +509,47 @@ function chooseWorld(idx) {
   startLevel(1, 0);
 }
 
-function showTouch(localChar) {
-  $('#touch').classList.toggle('hidden', !isTouch());
-  $('.tbtn-special').classList.toggle('hidden', !localChar?.special);
+// Knoppen in beeld alleen op een touchscherm zonder controller. Met een controller (zoals de Nimbus) staat er
+// in plaats daarvan een korte uitleg in beeld. Met de knop rechtsboven kun je de knoppen zelf tonen of verbergen.
+let touchChar = null;
+let controlsOverride = null; // null = automatisch, true = tonen, false = verbergen (geldt tot de app sluit)
+let legendTimer = null;
+function showTouch(localChar) { touchChar = localChar; refreshControls(true); }
+function refreshControls(fresh = false) {
+  if (mode !== 'play') { $('#pad-legend').classList.add('hidden'); return; }
+  const pads = connectedPads().length > 0, touch = isTouch();
+  const buttons = controlsOverride ?? (touch && !pads);
+  $('#touch').classList.toggle('hidden', !buttons);
+  $('.tbtn-special').classList.toggle('hidden', !touchChar?.special);
+  const legend = $('#pad-legend');
+  const wasHidden = legend.classList.contains('hidden');
+  legend.classList.toggle('hidden', buttons || !pads);
+  const duo = (run?.chars?.length || 1) > 1 && role !== 'guest';
+  $('#pl-special').textContent = duo || !touchChar?.special ? 'Special' : touchChar.special.name;
+  if (!legend.classList.contains('hidden') && (wasHidden || fresh)) {
+    legend.classList.remove('dim'); clearTimeout(legendTimer);
+    legendTimer = setTimeout(() => legend.classList.add('dim'), 6000);
+  }
+  const ctl = $('#btn-ctrl');
+  ctl.classList.toggle('hidden', !touch);
+  ctl.innerHTML = buttons
+    ? '<svg viewBox="0 0 24 24" width="24" height="24"><circle cx="7" cy="14" r="4" fill="currentColor"/><circle cx="17" cy="10" r="3" fill="currentColor"/><circle cx="17" cy="18" r="2.4" fill="currentColor"/><path d="M3 3l18 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>'
+    : '<svg viewBox="0 0 24 24" width="24" height="24"><circle cx="7" cy="14" r="4" fill="currentColor"/><circle cx="17" cy="10" r="3" fill="currentColor"/><circle cx="17" cy="18" r="2.4" fill="currentColor"/></svg>';
+  ctl.setAttribute('aria-label', buttons ? 'Knoppen verbergen' : 'Knoppen tonen');
+  ctl.title = buttons ? 'Knoppen verbergen' : 'Knoppen tonen';
 }
-function startLevel(level, checkpoint) {
+$('#btn-ctrl').addEventListener('click', () => {
+  const pads = connectedPads().length > 0;
+  const shown = controlsOverride ?? (isTouch() && !pads);
+  controlsOverride = !shown;
+  sfx.click(); refreshControls(true);
+});
+onPadCountChange((n) => {
+  if (n) $('#pad-help').classList.remove('hidden');
+  controlsOverride = null; // controller erbij of weg: weer automatisch kiezen
+  refreshControls(true);
+});
+function startLevel(level, checkpoint, refill = false) {
   initAudio();
   mode = 'play';
   closeModal();
@@ -504,11 +559,11 @@ function startLevel(level, checkpoint) {
   clearPressed();
   const cs = playingChars();
   showTouch(cs[0]);
-  renderHead($('#hud-life-ico'), cs[0], 30);
+  paintLifeIcons(cs);
   const ctls = cs.length === 1 ? [controllers[0]] : role === 'host' ? [controllers[0], remote] : [controllers[0], controllers[1]];
   const worldIdx = WORLDS.indexOf(currentWorld);
   if (role === 'host') { fxQueue = []; sendNet({ t: 'start', worldIdx, level, checkpoint, coins: run.coins, lives: run.lives, chars: run.chars, run }); }
-  game.start({ worldIdx, level, checkpoint, coins: run.coins, lives: run.lives, chars: cs, ctls });
+  game.start({ worldIdx, level, checkpoint, coins: run.coins, lives: run.lives, chars: cs, ctls, refill });
 }
 // gast: het spel van de host laten zien
 function guestStart(m) {
@@ -522,13 +577,22 @@ function guestStart(m) {
   clearPressed();
   const cs = m.chars.map(charById);
   showTouch(cs[1]);
-  renderHead($('#hud-life-ico'), cs[0], 30);
+  paintLifeIcons(cs);
   game.start({ worldIdx: m.worldIdx, level: m.level, checkpoint: m.checkpoint, coins: m.coins, lives: m.lives, chars: cs, ctls: [], mirror: true });
 }
 
+// levens zijn samen: met z'n tweeën staan beide hoofdjes bij de levens, zodat ook speler 2 ze ziet
+function paintLifeIcons(cs) {
+  renderHead($('#hud-life-ico'), cs[0], 30);
+  const two = $('#hud-life-ico2');
+  two.classList.toggle('hidden', cs.length < 2);
+  if (cs.length > 1) renderHead(two, cs[1], 30);
+  $('#hud-lives').classList.toggle('duo', cs.length > 1);
+  $('#hud-lives').title = cs.length > 1 ? 'Levens (samen)' : 'Levens';
+}
 function leaveGame() {
   game.running = false; mode = 'menu';
-  $('#hud').classList.add('hidden'); $('#touch').classList.add('hidden'); $('#boss-bar').classList.add('hidden');
+  $('#hud').classList.add('hidden'); $('#touch').classList.add('hidden'); $('#boss-bar').classList.add('hidden'); $('#pad-legend').classList.add('hidden');
   playMusic('title');
 }
 
@@ -545,9 +609,11 @@ function showPause(mine) {
     <p>${esc(currentWorld.name)} · level ${game.level} · ${game.coins} munten${mine ? '' : `<br><small>Speler ${role === 'host' ? 2 : 1} drukte op pauze</small>`}</p>
     <div class="menu">
       <button class="big-btn" data-act="resume">Verder</button>
+      <button class="big-btn alt" data-act="settings">⚙️ Instellingen</button>
       <button class="big-btn alt" data-act="stop">Stoppen</button>
     </div>`, (act) => {
     if (act === 'resume') { closeModal(); game.paused = false; clearPressed(); sendNet({ t: 'resume' }); }
+    if (act === 'settings') { openSettings(() => showPause(mine)); return; }
     if (act === 'stop') {
       if (!game.coins) { closeModal(); doStop(); return; } // 0 munten: geen bevestiging nodig
       modal(`<h2>Stoppen?</h2><p>Het spel stopt en de score van <b>${game.coins} munten</b> wordt geregistreerd.</p>
@@ -564,7 +630,46 @@ function doStop() {
   run.coins = game.coins; endRun('stop');
 }
 $('#btn-pause').addEventListener('click', pause);
-initInput(pause, (dir) => { if (mode !== 'play') spatialNav(dir); });
+
+// ---------- instellingen (ook tijdens het spel) ----------
+function openSettings(back = null) {
+  const inGame = mode === 'play' && game.running;
+  const wasPaused = game.paused;
+  if (inGame) game.paused = true;
+  const render = (focusAct) => {
+    const pads = connectedPads().length > 0;
+    const buttonsOn = controlsOverride ?? (isTouch() && !pads);
+    const row = (label, act, on) => `<div class="set-row"><span>${label}</span><button class="toggle ${on ? 'on' : ''}" data-act="${act}">${on ? 'Aan' : 'Uit'}</button></div>`;
+    modal(`<h2>Instellingen</h2>
+      ${row('🎵 Muziek', 'music', settings.music)}
+      ${row('🔊 Geluidseffecten', 'sfx', settings.sfx)}
+      ${inGame && isTouch() ? row('👆 Knoppen in beeld', 'buttons', buttonsOn) : ''}
+      <div class="menu"><button class="big-btn" data-act="close">${back ? 'Terug' : inGame ? 'Verder spelen' : 'Klaar'}</button></div>`, (act) => {
+      if (act === 'music') { toggleMusic(); render('music'); }
+      if (act === 'sfx') { toggleSfx(); render('sfx'); }
+      if (act === 'buttons') { controlsOverride = !buttonsOn; refreshControls(true); render('buttons'); }
+      if (act === 'close') {
+        if (back) { back(); return; }
+        closeModal();
+        if (inGame && !wasPaused) { game.paused = false; clearPressed(); }
+      }
+    });
+    if (focusAct && connectedPads().length) requestAnimationFrame(() => $(`#modal-card [data-act="${focusAct}"]`)?.focus());
+  };
+  render();
+}
+$('#btn-settings').addEventListener('click', () => {
+  if (mode !== 'play' || !$('#modal').classList.contains('hidden')) return;
+  sfx.click(); openSettings();
+});
+initInput(pause, (dir, padIdx) => {
+  if (mode === 'play') return;
+  const choosing = party.mode === 'local2' && !$('#scr-chars').classList.contains('hidden') && $('#modal').classList.contains('hidden');
+  if (choosing && connectedPads().length >= 2 && padIdx !== party.slot) return;
+  spatialNav(dir);
+});
+// tik of muis: de gele controller-rand is dan niet nodig
+window.addEventListener('pointerdown', () => document.body.classList.remove('padnav'));
 onPadConnected(() => { $('#pad-help').classList.remove('hidden'); });
 
 // ---------- modal ----------
@@ -742,7 +847,7 @@ async function buildScores(tab, players = 1) {
     const inis = Array.isArray(r.initials) ? r.initials : [r.initials];
     const done = Array.isArray(r.worlds) ? r.worlds : []; // oude scores (met alleen de gespeelde wereld) krijgen geen sticker
     const row = document.createElement('div');
-    row.className = `score-row ${i < 3 ? 'top' + (i + 1) : ''} ${r.id && r.id === highlightId ? 'me' : ''}`;
+    row.className = `score-row ${chars.length > 1 ? 'duo' : ''} ${i < 3 ? 'top' + (i + 1) : ''} ${r.id && r.id === highlightId ? 'me' : ''}`;
     const cup = i < 3 ? `<svg class="cup c${i + 1}" viewBox="0 0 32 32"><path d="M9 4h14v7a7 7 0 0 1-14 0z"/><path d="M9 6H4v2a5 5 0 0 0 5 5M23 6h5v2a5 5 0 0 1-5 5" fill="none" stroke-width="2.4"/><rect x="14" y="17" width="4" height="6"/><rect x="9" y="23" width="14" height="4" rx="1.5"/></svg>` : '';
     const faces = chars.length > 1 ? `<span class="faces">${chars.map((c) => `<canvas title="${c.name}"></canvas>`).join('')}</span>` : `<canvas class="face" title="${chars[0].name}"></canvas>`;
     row.innerHTML = `<span class="rank">${cup}<b>${i + 1}</b></span><span class="ini ${inis.length > 1 ? 'duo' : ''}">${inis.map(esc).join(' & ')}</span>
@@ -819,13 +924,18 @@ function checkRotate() {
 }
 
 // ---------- main loop ----------
-window.addEventListener('resize', () => { game.resize(); checkRotate(); if (role === 'guest') sendNet({ t: 'hello', viewW: game.baseViewW }); });
+function onResize() { game.resize(); checkRotate(); if (role === 'guest') sendNet({ t: 'hello', viewW: game.baseViewW }); }
+window.addEventListener('resize', onResize);
+window.visualViewport?.addEventListener('resize', onResize);
+window.addEventListener('orientationchange', () => { for (const ms of [100, 300, 700]) setTimeout(onResize, ms); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && mode === 'play' && game.running && !game.paused) pause(); });
 let last = performance.now();
 let frameNo = 0;
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   frameNo++;
+  if (game.sizeChanged()) onResize();
+  checkPadCount();
   pollInput(mode === 'play');
   if (mode === 'play' && game.lv) {
     if (role === 'guest') {

@@ -6,20 +6,20 @@ Speel alleen of met z'n tweeën. Kies een van de acht personages, elk met een ei
 
 ## Personages
 
-| Personage | Wapen | Superkracht |
+| Personage | Wapen | Speciale knop |
 |---|---|---|
-| Avalon | Bordkrijtjes | Supersnel, gooit krijtjes die vanzelf op de dichtstbijzijnde vijand afgaan. Speciale knop: strikje op de dichtstbijzijnde vijand, die is dan even poeslief en ongevaarlijk |
-| Fu-Chi | Klauwen + haarbal | Supersnel krabben, springt het hoogst. Speciale knop: haarbal spugen |
-| Papa | Bierflesjes | Veelzijdig: gooit ver in een boogje, schuim raakt vijanden in de buurt |
-| Mama | Microfoon | Veelzijdig: schreeuwgolf die door alle vijanden heen gaat |
-| Oma | Appeltaart | Langzaam, kort bereik, veel kracht; de vijand staat even stil |
-| Opa | Moersleutel | Langzaam, kort bereik, de meeste kracht |
-| Lolo | Hamer | Langzaam, klap op de grond die alle vijanden vlak naast hem raakt |
-| Lola | Rijst | Langzaam, gooit een handvol rijst: dichtbij raakt bijna elke korrel |
+| Avalon | Bordkrijtjes (gaan vanzelf op de dichtstbijzijnde vijand af) | Strikje: de dichtstbijzijnde vijand wordt even poeslief en ongevaarlijk |
+| Fu-Chi | Klauwen | Haarbal spugen |
+| Papa | Bierflesjes | Boer: een groene wolk die vijanden even uitschakelt |
+| Mama | Microfoon | Karaoke: alle vijanden in beeld gaan dansen |
+| Oma | Appeltaart | Breiwol: een rollende bol wol die vijanden inpakt |
+| Opa | Moersleutel | Dutje: Opa snurkt en de vijanden om hem heen vallen in slaap |
+| Lolo | Hamer | Bananenschil: de eerste vijand die erover loopt glijdt uit |
+| Lola | Rijst | Koekenpan: BOING, de vijand is even zo plat als een pannenkoek |
 
 ## Een spel
 
-Je kiest één personage en speelt daarmee het hele spel. Je hebt 3 levens voor alle vier de werelden samen, en binnen een leven 3 hartjes. Zijn je hartjes op, dan verlies je een leven en ga je terug naar het laatste checkpoint. Bij elk nieuw level krijg je je hartjes terug.
+Je kiest één personage en speelt daarmee het hele spel. Je hebt 3 levens voor alle vier de werelden samen, en binnen een leven 3 hartjes. Zijn je hartjes op, dan verlies je een leven en ga je terug naar het laatste checkpoint. Bij elk nieuw level krijg je je hartjes terug (met een geluidje).
 
 Je kiest zelf welke wereld je speelt, maar je blijft in die wereld tot je hem hebt uitgespeeld. Daarna kies je de volgende. Uitgespeelde werelden krijgen een sticker en je krijgt er een leven bij. Het spel is afgelopen als je alle vier de werelden hebt uitgespeeld, als je levens op zijn (game over) of als je stopt via de pauzeknop. Je score wordt dan altijd geregistreerd en je ziet meteen het scorebord, met jouw nieuwe score gemarkeerd.
 
@@ -48,8 +48,9 @@ Elke wereld heeft 11 soorten vijanden (44 in totaal) en elk level een andere mix
 
 - **Laptop:** pijltjes of A/D lopen, spatie of pijl omhoog springen, X of J aanvallen, C of L speciale aanval, Esc pauze
 - **2 spelers op één toetsenbord:** speler 1 A/D lopen, W springen, F aanvallen, G speciaal; speler 2 pijltjes, pijl omhoog springen, K aanvallen, L speciaal
-- **Controller** (zoals de SteelSeries Nimbus): stick of pijltjes lopen, A springen, B of X aanvallen, Y speciaal, Menu pauze. In de menu's kies je met de stick en A, en ga je terug met B.
-- **iPad:** schuifknop links om te lopen, knoppen rechts om aan te vallen en te springen (Avalon en Fu-Chi hebben een extra roze knop voor hun speciale aanval) (speel met het scherm liggend). Zet de game via Delen > Zet op beginscherm als app op je iPad.
+- **Controller** (zoals de SteelSeries Nimbus): stick of pijltjes lopen, A (rood) springen, B (groen) wapen, Y (blauw) special, Menu pauze. In de menu's kies je met de stick en A, en ga je terug met B. Met twee controllers kiest elke speler zijn eigen personage met zijn eigen controller. Is er een controller verbonden, dan staan er geen knoppen in beeld maar een korte uitleg.
+- **iPad:** schuifknop links om te lopen, knoppen rechts om aan te vallen, te springen en voor de speciale aanval (speel met het scherm liggend). Met de knop rechtsboven zet je de knoppen in beeld aan of uit. Zet de game via Delen > Zet op beginscherm als app op je iPad.
+- **Instellingen:** met het tandwiel rechtsboven (of via het pauzemenu) zet je tijdens het spelen muziek en geluidseffecten aan of uit.
 - In de Lucht-wereld kun je dubbel springen, onderwater kun je zwemmen door steeds op springen te drukken.
 
 ## Scores

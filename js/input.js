@@ -54,7 +54,7 @@ const mapB = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'jump', ArrowDow
 export function clearPressed() { for (const c of controllers) c.clear(); remote.clear(); }
 
 let onPauseCb = () => {};
-let menuNav = null; // functie(richting|'ok'|'back') zolang er geen spel loopt
+let menuNav = null; // functie(richting|'ok'|'back', controllernummer) zolang er geen spel loopt
 
 export function initInput(onPause, navFn) {
   onPauseCb = onPause; menuNav = navFn;
@@ -182,7 +182,7 @@ export function pollInput(playing) {
       for (const [k, v] of Object.entries(dirs)) {
         const was = prev[k];
         const rep = prev['t_' + k] || 0;
-        if (v && (!was || (k !== 'ok' && k !== 'back' && now - rep > 260))) { menuNav(k); st['t_' + k] = now; }
+        if (v && (!was || (k !== 'ok' && k !== 'back' && now - rep > 260))) { menuNav(k, i); st['t_' + k] = now; }
         else if (v) st['t_' + k] = rep;
       }
     }
@@ -192,15 +192,22 @@ export function pollInput(playing) {
   controllers[1].apply(merged[1]);
 }
 
+let padCount = 0, padCountCb = null;
+export function onPadCountChange(fn) { padCountCb = fn; }
+export function checkPadCount() {
+  const n = connectedPads().length;
+  if (n !== padCount) { padCount = n; padCountCb?.(n); }
+}
 export const isTouch = () => ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 
 // ---------- menu bedienen met een controller ----------
 // Kiest de knop die het dichtst in de gekozen richting ligt (zoals op een tv)
 export function spatialNav(dir) {
+  document.body.classList.add('padnav'); // laat duidelijk zien welke knop gekozen is
   const layer = !document.getElementById('modal').classList.contains('hidden') ? document.getElementById('modal')
     : document.querySelector('.screen:not(.hidden)');
   if (!layer) return;
-  const items = [...layer.querySelectorAll('button:not([disabled]), .card')].filter((el) => el.offsetParent !== null);
+  const items = [...layer.querySelectorAll('button:not([disabled]), .card')].filter((el) => el.offsetParent !== null && !el.disabled);
   if (!items.length) return;
   let cur = document.activeElement;
   if (!items.includes(cur)) {

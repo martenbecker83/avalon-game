@@ -354,3 +354,44 @@ button { font-family: inherit; color: inherit; cursor: pointer; border: 0; }
 
 /* ---------- bediening met een controller (tv) ---------- */
 button:focus-visible, .card:focus-visible { outline: 5px solid #ffc531; outline-offset: 3px; }
+
+/* ---------- scorebord 2 spelers: genoeg ruimte voor twee initialen en twee gezichtjes ---------- */
+.score-row.duo { grid-template-columns: 58px minmax(120px, max-content) 74px 1fr auto 70px; }
+.score-row .ini { overflow: hidden; white-space: nowrap; }
+.score-row .faces { min-width: 0; }
+.score-row .date { white-space: nowrap; }
+@media (max-width: 640px) {
+  .score-row.duo { grid-template-columns: 44px max-content 70px 1fr 56px; }
+  .score-row.duo .medal-row.mini { display: none; }
+}
+#hud-life-ico2 { width: 28px; height: 28px; border-radius: 50%; background: #e6f3fe; }
+#hud-lives.duo #hud-life-ico { box-shadow: 0 0 0 2px #3a8ee8; }
+#hud-lives.duo #hud-life-ico2 { box-shadow: 0 0 0 2px #ff8a2a; margin-left: -6px; margin-right: 2px; }
+
+/* ---------- knoppen rechtsboven: knoppen tonen/verbergen, instellingen, pauze ---------- */
+.hud-right { display: flex; gap: 10px; align-items: center; pointer-events: auto; }
+.round-btn.small-round { width: 44px; height: 44px; font-size: 18px; display: inline-flex; align-items: center; justify-content: center; }
+#btn-ctrl svg, #btn-settings svg { display: block; }
+
+/* ---------- uitleg van de controller ---------- */
+#pad-legend { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(14px, env(safe-area-inset-bottom)); display: flex; gap: 10px;
+  pointer-events: none; transition: opacity 1s; }
+#pad-legend.dim { opacity: .55; }
+.pl-item { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,.88); border-radius: 999px; padding: 3px 14px 3px 4px; font-size: 18px; font-weight: 800; box-shadow: 0 3px 0 rgba(0,0,0,.12); white-space: nowrap; }
+.pb { font-style: normal; width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 16px; font-weight: 800; box-shadow: inset 0 -3px 0 rgba(0,0,0,.2); }
+.pb-a { background: #e8413a; } .pb-b { background: #2fae3b; } .pb-y { background: #2f7fe0; } .pb-x { background: #f2b51c; }
+
+/* ---------- menu met een controller: duidelijk zichtbaar welke knop gekozen is ---------- */
+body.padnav button:focus, body.padnav .card:focus { outline: 5px solid #ffc531; outline-offset: 3px; position: relative; z-index: 1; }
+body.padnav .card:focus { transform: scale(1.03); }
+
+/* ---------- instellingen ---------- */
+.set-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 8px 4px; font-size: 21px; font-weight: 800; border-bottom: 2px solid #eef2f6; }
+.set-row:last-of-type { border-bottom: 0; }
+.toggle { min-width: 110px; padding: 6px 16px; border-radius: 999px; font-size: 18px; font-weight: 800; background: #e2eaf3; color: var(--ink-soft); box-shadow: 0 3px 0 #c9d6e4; }
+.toggle.on { background: var(--green); color: #fff; box-shadow: 0 3px 0 var(--green-dark); }
+/* nieuw level: hartjes weer vol */
+#hud-hearts.refill .h, #hud-hearts2.refill .h { animation: heartPop .6s cubic-bezier(.2,1.8,.4,1) both; }
+#hud-hearts.refill .h:nth-of-type(2), #hud-hearts2.refill .h:nth-of-type(2) { animation-delay: .1s; }
+#hud-hearts.refill .h:nth-of-type(3), #hud-hearts2.refill .h:nth-of-type(3) { animation-delay: .2s; }
+@keyframes heartPop { 0% { transform: scale(.3); } 60% { transform: scale(1.35); } 100% { transform: scale(1); } }

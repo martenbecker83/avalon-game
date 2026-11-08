@@ -39,6 +39,7 @@ export class Game {
     // meet het canvas zelf: op een iPad (zeker als app op het beginscherm) wijkt 100vh af van de echte hoogte,
     // waardoor het beeld uitgerekt en wazig werd
     const w = this.cv.clientWidth || window.innerWidth, h = this.cv.clientHeight || window.innerHeight;
+    this.mw = this.cv.clientWidth; this.mh = this.cv.clientHeight; // laatst gemeten maat (zie sizeChanged)
     this.cv.width = Math.round(w * dpr); this.cv.height = Math.round(h * dpr);
     let scale = (h * dpr) / VIEW_H;
     let viewW = (w * dpr) / scale;
@@ -47,6 +48,9 @@ export class Game {
     this.baseScale = scale; this.baseViewW = viewW; this.baseViewH = (h * dpr) / scale;
     this.applyZoom();
   }
+  // Op een iPad komt de resize-melding na draaien soms vóórdat de nieuwe maat bekend is. Dan bleef het canvas op de
+  // oude maat staan en werd het beeld uitgerekt (een ronde zon werd een ovaal). Daarom elke frame even controleren.
+  sizeChanged() { return this.cv.clientWidth !== this.mw || this.cv.clientHeight !== this.mh; }
   applyZoom() {
     this.scale = this.baseScale / this.zoom;
     this.viewW = this.baseViewW * this.zoom;
@@ -55,7 +59,9 @@ export class Game {
 
   // ---------- setup ----------
   // chars: één of twee personages; ctls: de bijbehorende controllers; mirror: alleen tonen (tweede apparaat)
-  start({ worldIdx, level, checkpoint, coins, chars, ctls, lives = 3, mirror = false }) {
+  start({ worldIdx, level, checkpoint, coins, chars, ctls, lives = 3, mirror = false, refill = false }) {
+    // hartjes die bij een nieuw level weer vol worden: welke spelers misten er een?
+    const missing = refill && this.players.length ? this.players.map((p) => p.down || p.hearts < MAX_HEARTS) : [];
     this.lives = lives;
     this.worldIdx = worldIdx; this.world = WORLDS[worldIdx];
     this.chars = chars; this.ctls = ctls || [];
@@ -72,7 +78,18 @@ export class Game {
       playMusic(this.world.music);
       this.hooks.onBanner(`${this.world.name}`, `Level ${level}`);
       this.hud();
+      if (missing.some(Boolean)) this.refillEffect(missing);
     }
+  }
+  // nieuw level: hartjes weer vol, met geluid en hartjes die opspringen
+  refillEffect(missing) {
+    sfx.heartsFull();
+    this.hooks.onRefill?.(missing);
+    this.players.forEach((p, i) => {
+      if (!missing[i]) return;
+      for (let k = 0; k < 10; k++) this.particles.push({ kind: 'heart', x: p.x, y: p.y - p.h * 0.6, vx: (Math.random() - 0.5) * 220, vy: -160 - Math.random() * 220, life: 1, max: 1 });
+      this.texts.push({ x: p.x, y: p.y - p.h - 26, text: '♥ ♥ ♥', life: 1.4, vy: -40, color: '#ff5a7a' });
+    });
   }
   get multi() { return this.players.length > 1; }
 
@@ -471,12 +488,59 @@ export class Game {
       p.atkT = p.atkDur = 0.25;
       if (!best) { p.cd2 = 0.3; this.texts.push({ x: p.x, y: p.y - p.h - 20, text: '?', life: 0.8, vy: -40, color: '#ff8ac0' }); return; }
       sfx.bow();
-      best.bow = true;
+      best.bow = true; best.mood = null;
       if (best.isBoss) { best.stun = Math.max(best.stun, 1.0); best.calm = 1.0; }
       else { best.calm = 4.5; best.vx = 0; best.charging = 0; best.windup = 0; }
       const b = this.boxOf(best);
       for (let k = 0; k < 16; k++) this.particles.push({ kind: 'spark', x: (b.l + b.r) / 2, y: b.t, vx: (Math.random() - 0.5) * 260, vy: -Math.random() * 260, life: 0.7, max: 0.7, color: k % 2 ? '#ff5fa2' : '#fff' });
       this.texts.push({ x: (b.l + b.r) / 2, y: b.t - 24, text: 'Strikje!', life: 1, vy: -50, color: '#ff8ac0' });
+    } else if (s.type === 'burp') {
+      // Papa laat een gigantische boer: een groene wolk die vijanden even van de kaart brengt
+      p.atkT = p.atkDur = 0.45; sfx.burp(); this.shake = Math.max(this.shake, 4);
+      const my = p.y - p.h * 0.8;
+      this.projectiles.push({ type: 'burp', x: p.x + p.dir * 30, y: my, vx: p.dir * 420, vy: 0, g: 0, life: 0.6, age: 0, dmg: s.dmg, pierce: true, dir: p.dir, w: 90, h: 100, hit: new Set(), stun: 1.6, mood: 'burp', owner: p });
+      for (let i = 0; i < 10; i++) this.particles.push({ kind: 'gas', x: p.x + p.dir * 24, y: my, vx: p.dir * (120 + Math.random() * 220), vy: (Math.random() - 0.5) * 120, life: 0.8, max: 0.8 });
+      this.texts.push({ x: p.x, y: p.y - p.h - 24, text: 'BOEOERRR!', life: 1.1, vy: -40, color: '#b6e35a' });
+    } else if (s.type === 'karaoke') {
+      // Mama zingt karaoke: alle vijanden in beeld gaan dansen en doen niemand meer kwaad
+      p.atkT = p.atkDur = 1.0; sfx.karaoke();
+      let n = 0;
+      for (const e of this.targets()) {
+        if (Math.abs(e.x - p.x) > this.viewW * 0.7) continue;
+        if (e.isBoss) { e.stun = Math.max(e.stun, 1.2); continue; }
+        e.calm = 4; e.mood = 'dance'; e.vx = 0; e.charging = 0; e.windup = 0; n++;
+      }
+      for (let i = 0; i < 14; i++) this.particles.push({ kind: 'note', x: p.x + (Math.random() - 0.5) * 60, y: p.y - p.h - 10, vx: (Math.random() - 0.5) * 260, vy: -80 - Math.random() * 160, life: 1.4, max: 1.4, color: ['#ff5fa2', '#7c5cff', '#2f9be0', '#ffb020'][i % 4] });
+      this.texts.push({ x: p.x, y: p.y - p.h - 24, text: n ? 'Dansen!' : '♪ La la la ♪', life: 1.2, vy: -40, color: '#ff8ac0' });
+    } else if (s.type === 'yarn') {
+      // Oma rolt een bol breiwol weg: vijanden die hij raakt zitten even helemaal ingepakt
+      p.atkT = p.atkDur = 0.3; sfx.throw();
+      this.projectiles.push({ type: 'yarn', x: p.x + p.dir * 20, y: p.y - 30, vx: p.dir * 430, vy: -200, g: 1500, life: 1.8, age: 0, dmg: s.dmg, rot: 0, spin: p.dir * 12, w: 26, h: 26, hit: new Set(), pierce: true, roll: true, stun: 2.6, mood: 'tangle', owner: p });
+    } else if (s.type === 'nap') {
+      // Opa doet een dutje: hij snurkt zo hard dat de vijanden om hem heen mee in slaap vallen
+      p.atkT = p.atkDur = 0.4; sfx.snore();
+      let n = 0;
+      for (const e of this.targets()) {
+        if (Math.hypot(e.x - p.x, (e.y - p.y) * 0.7) > 380) continue;
+        if (e.isBoss) { e.stun = Math.max(e.stun, 1.3); continue; }
+        e.calm = 4.5; e.mood = 'sleep'; e.vx = 0; e.charging = 0; e.windup = 0; n++;
+      }
+      for (let i = 0; i < 4; i++) this.texts.push({ x: p.x + 14 + i * 10, y: p.y - p.h - 10 - i * 18, text: 'Z', life: 1 + i * 0.25, vy: -50, color: '#cfe6ff' });
+      if (!n) this.texts.push({ x: p.x, y: p.y - p.h - 70, text: 'Hè hè…', life: 1, vy: -30, color: '#fff' });
+    } else if (s.type === 'peel') {
+      // Lolo gooit een bananenschil neer: de eerste vijand die erover loopt glijdt uit
+      const mine = this.projectiles.filter((q) => q.type === 'peel' && q.owner === p);
+      if (mine.length >= 3) mine[0].dead = true;
+      p.atkT = p.atkDur = 0.25; sfx.throw();
+      this.projectiles.push({ type: 'peel', x: p.x + p.dir * 20, y: p.y - p.h * 0.6, vx: p.dir * 260, vy: -260, g: 1400, life: 10, age: 0, dmg: s.dmg, rot: 0, spin: p.dir * 10, w: 34, h: 16, hit: new Set(), stun: 1.4, mood: 'slip', peel: true, owner: p });
+    } else if (s.type === 'pan') {
+      // Lola geeft een BOING met de koekenpan: de vijand wordt even zo plat als een pannenkoek
+      p.atkT = p.atkDur = 0.3; sfx.boing();
+      const box = { l: p.x + (p.dir > 0 ? -4 : -80), r: p.x + (p.dir > 0 ? 80 : 4), t: p.y - p.h - 20, b: p.y + 6 };
+      let hit = false;
+      for (const e of this.targets()) if (overlap(box, this.boxOf(e))) { this.damage(e, s.dmg, { fromX: p.x, stun: 1.6, mood: 'flat' }); hit = true; }
+      this.particles.push({ kind: 'pan', x: p.x + p.dir * 44, y: p.y - p.h * 0.6, dir: p.dir, life: 0.3, max: 0.3 });
+      if (hit) this.texts.push({ x: p.x + p.dir * 50, y: p.y - p.h - 20, text: 'BOING!', life: 0.9, vy: -60, color: '#ffd34d' });
     }
   }
 
@@ -529,6 +593,7 @@ export class Game {
     if (e.dead) return;
     e.hp -= dmg; e.flash = 0.12;
     if (opts.stun) e.stun = e.isBoss ? Math.min(0.6, opts.stun) : opts.stun;
+    if (!e.isBoss) e.mood = opts.mood || null;
     this.particles.push({ kind: 'hit', x: e.x, y: e.y - (e.isBoss ? 80 * e.scale : e.h * 0.6), life: 0.25, max: 0.25 });
     if (e.isBoss) { sfx.bossHit(); this.hooks.onBossBar(e.name, Math.max(0, e.hp / e.maxhp)); this.shake = Math.max(this.shake, 3); }
     else { sfx.hit(); e.vx = Math.sign(e.x - (opts.fromX ?? e.x - 1)) * 120; if (!e.flying && e.pop === undefined) e.vy = -160; }
@@ -576,12 +641,23 @@ export class Game {
       if (q.age > q.life) { q.dead = true; if (q.splash) this.shatter(q); }
       if (q.dead) continue;
       const box = { l: q.x - q.w / 2, r: q.x + q.w / 2, t: q.y - q.h / 2, b: q.y + q.h / 2 };
+      if (q.peel && !q.landed) { this.landPeel(q); continue; }
       for (const e of this.targets()) {
         if (q.hit.has(e)) continue;
+        if (q.peel) {
+          if (e.flying && !e.diving) continue;
+          const eb = this.boxOf(e);
+          if (!overlap({ l: q.x - 16, r: q.x + 16, t: q.y - 10, b: q.y + 4 }, { ...eb, t: eb.b - 14 })) continue;
+          q.dead = true; sfx.slip();
+          this.damage(e, q.dmg, { stun: q.stun, fromX: q.x - (e.dir || 1) * 10, mood: 'slip' });
+          if (!e.isBoss && !e.flying && e.pop === undefined) e.vy = -380;
+          this.texts.push({ x: q.x, y: q.y - 50, text: 'Oeps!', life: 0.9, vy: -60, color: '#ffe14a' });
+          break;
+        }
         if (overlap(box, this.boxOf(e))) {
           q.hit.add(e);
           if (q.splash) { this.shatter(q); q.dead = true; break; }
-          this.damage(e, q.dmg, { stun: q.stun, fromX: q.x - q.vx });
+          this.damage(e, q.dmg, { stun: q.stun, fromX: q.x - q.vx, mood: q.mood });
           if (q.type === 'pie') { sfx.splat(); this.splat(q.x, q.y, '#f2e2b0'); }
           if (q.type === 'wrench') sfx.clang();
           if (q.type === 'chalk') { sfx.chalkHit(); this.chalkDust(q.x, q.y, q.color); }
@@ -590,8 +666,16 @@ export class Game {
           if (!q.pierce) { q.dead = true; break; }
         }
       }
+      // breiwol rolt over de grond
+      if (!q.dead && q.roll) {
+        const gy = this.groundAt(q.x);
+        if (gy !== null && q.y > gy - q.h / 2 && q.vy > 0) { q.y = gy - q.h / 2; q.vy = -Math.abs(q.vy) * 0.3; if (Math.abs(q.vy) < 60) q.vy = 0; }
+        if (q.y > GROUND_Y + 300) q.dead = true;
+        continue;
+      }
+      if (q.peel) continue;
       // hit ground
-      if (!q.dead && q.type !== 'wave' && !q.boomerang) {
+      if (!q.dead && q.type !== 'wave' && q.type !== 'burp' && !q.boomerang) {
         const gy = this.groundAt(q.x);
         if (gy !== null && q.y > gy - 4) {
           q.dead = true;
@@ -626,6 +710,11 @@ export class Game {
     }
     this.hostile = this.hostile.filter((h) => !h.dead);
   }
+  landPeel(q) {
+    const gy = this.groundBelow(q.x, q.y - 30);
+    if (gy !== null && q.y >= gy - 4 && q.vy > 0) { q.y = gy - 4; q.vx = 0; q.vy = 0; q.g = 0; q.spin = 0; q.rot = 0; q.landed = true; this.dust(q.x, gy, 3); }
+    if (q.y > GROUND_Y + 300) q.dead = true;
+  }
   shatter(q) {
     sfx.glass();
     const box = { l: q.x - 60, r: q.x + 60, t: q.y - 60, b: q.y + 50 };
@@ -646,6 +735,7 @@ export class Game {
       e.t += dt;
       if (e.flash > 0) e.flash -= dt;
       if (e.calm > 0) e.calm -= dt;
+      if (e.mood && e.calm <= 0 && e.stun <= 0) e.mood = null;
       if (e.stun > 0 || e.calm > 0) {
         if (e.stun > 0) e.stun -= dt;
         e.vx *= 0.9; e.aim = 0;
@@ -664,7 +754,16 @@ export class Game {
         }
         case 'hopper': {
           e.cool -= dt;
-          if (e.onGround) { e.vx *= 0.8; if (e.cool <= 0) { e.dir = Math.abs(dxp) < 400 ? Math.sign(dxp) : e.dir; e.vy = -520; e.vx = e.dir * d.speed; e.cool = 1.2 + Math.random(); e.onGround = false; } }
+          if (e.onGround) {
+            e.vx *= 0.8;
+            if (e.cool <= 0) {
+              e.dir = Math.abs(dxp) < 400 ? Math.sign(dxp) || e.dir : e.dir;
+              // niet zelf het ravijn in springen: kijk eerst of de landingsplek veilig is, anders de andere kant op of op de plek
+              let vx = e.dir * d.speed;
+              if (!this.landsSafe(e, vx, -520)) { e.dir *= -1; vx = e.dir * d.speed; if (!this.landsSafe(e, vx, -520)) vx = 0; }
+              e.vy = -520; e.vx = vx; e.cool = 1.2 + Math.random(); e.onGround = false;
+            }
+          }
           this.patrol(e);
           this.enemyPhysics(e, dt);
           break;
@@ -754,7 +853,7 @@ export class Game {
           } else {
             e.cool -= dt;
             e.y = e.homeY + Math.sin(e.t * 2) * 4;
-            if (e.cool <= 0 && Math.abs(dxp) < 70 && p.y > e.y) { e.state = 'drop'; e.vy = 0; }
+            if (e.cool <= 0 && Math.abs(dxp) < 70 && p.y > e.y && this.groundBelow(e.x, e.homeY) !== null) { e.state = 'drop'; e.vy = 0; }
           }
           e.dir = Math.sign(dxp) || 1;
           break;
@@ -789,6 +888,20 @@ export class Game {
     for (const pl of this.plats) if (ax > pl.x && ax < pl.x + pl.w && Math.abs(pl.y - e.y) < 8) return true;
     return false;
   }
+  landsSafe(e, vx, vy) {
+    const g = this.world.physics.gravity, dt = 1 / 30;
+    let x = e.x, y = e.y;
+    for (let i = 0; i < 120; i++) {
+      const py = y; vy = Math.min(vy + g * dt, this.world.physics.maxFall); x += vx * dt; y += vy * dt;
+      if (vy > 0) {
+        const gy = this.groundAt(x);
+        if (gy !== null && y >= gy && py <= gy + 14) return true;
+        for (const pl of this.plats) if (x > pl.x && x < pl.x + pl.w && py <= pl.y + 4 && y >= pl.y) return true;
+      }
+      if (y > GROUND_Y + 200) return false;
+    }
+    return false;
+  }
   patrol(e) {
     if (e.onGround && !this.groundAhead(e)) { e.dir *= -1; e.vx = e.dir * Math.abs(e.vx); }
     if (!e.summoned && Math.abs(e.x - e.home) > (e.range || 120) && Math.sign(e.x - e.home) === e.dir) { e.dir *= -1; }
@@ -800,9 +913,19 @@ export class Game {
   enemyPhysics(e, dt) {
     if (e.flying || e.pop !== undefined) return;
     const ph = this.world.physics;
-    const prev = e.y;
+    const prev = e.y, prevX = e.x, wasGround = e.onGround;
     e.vy = Math.min(e.vy + ph.gravity * dt, ph.maxFall);
-    e.x += e.vx * dt; e.y += e.vy * dt;
+    e.x += e.vx * dt;
+    // vijanden lopen nooit zelf een ravijn in: stonden ze op de grond en is er onder de nieuwe plek niets, dan draaien ze om
+    if (wasGround && e.vy >= 0 && this.groundBelow(e.x, e.y - 4) === null) {
+      e.x = prevX; e.dir *= -1; e.vx = e.charging > 0 ? 0 : -e.vx; e.charging = 0;
+    }
+    if (wasGround) e.safeX = e.x;
+    // in de lucht boven een ravijn (sprong of duw): stuur terug naar de laatste veilige plek
+    if (!wasGround && e.safeX !== undefined && e.vy > 0 && this.groundBelow(e.x, e.y) === null) {
+      e.vx = Math.sign(e.safeX - e.x) * Math.max(160, Math.abs(e.vx));
+    }
+    e.y += e.vy * dt;
     e.onGround = false;
     const gy = this.groundAt(e.x);
     if (gy !== null && e.y >= gy && prev <= gy + 14) { e.y = gy; e.vy = 0; e.onGround = true; }
@@ -1103,6 +1226,9 @@ export class Game {
       q.life -= dt;
       if (q.kind === 'coin' || q.kind === 'glass' || q.kind === 'foam' || q.kind === 'blob' || q.kind === 'spark') q.vy += 900 * dt;
       if (q.kind === 'bubble') q.vx = Math.sin(q.life * 10) * 30;
+      if (q.kind === 'heart') q.vy += 300 * dt;
+      if (q.kind === 'gas') { q.vx *= 0.96; q.vy -= 20 * dt; }
+      if (q.kind === 'note') q.vx = Math.sin(q.life * 6) * 50;
       q.x += (q.vx || 0) * dt; q.y += (q.vy || 0) * dt;
     }
     this.particles = this.particles.filter((q) => q.life > 0);
@@ -1162,7 +1288,7 @@ export class Game {
       pl: this.players.map((p) => [R(p.x), R(p.y), R(p.vx), R(p.vy), p.dir, R1(p.walk), p.onGround ? 1 : 0, Math.round(p.atkT * 100) / 100, p.atkDur, R1(p.inv), p.hearts, p.down > 0 ? 1 : 0, Math.round(p.spitT * 100) / 100]),
       en: this.enemies.filter((e) => !e.dead).map((e) => [e.id, e.type, R(e.x), R(e.y), e.dir, R1(e.hp), e.maxhp, R1(e.stun), R1(e.flash),
         (e.puffed ? 1 : 0) | (e.onGround ? 2 : 0) | (e.hard ? 4 : 0) | (e.bow ? 8 : 0) | (e.charging > 0 ? 16 : 0) | (e.windup > 0 ? 32 : 0) | (e.diving ? 64 : 0),
-        R1(e.calm), R1(e.aim), e.pop === undefined ? -1 : Math.round(e.pop * 100) / 100, R(e.homeY)]),
+        R1(e.calm), R1(e.aim), e.pop === undefined ? -1 : Math.round(e.pop * 100) / 100, R(e.homeY), e.mood || 0]),
       bo: b && !b.dead ? { ...b, x: R(b.x), y: R(b.y) } : null,
       pr: this.projectiles.map(pr),
       ho: this.hostile.filter((h) => h.type !== 'warn' || true).map(pr),
@@ -1185,7 +1311,7 @@ export class Game {
       const def = ENEMY_TYPES[a[1]];
       return { id: a[0], type: a[1], def, x: a[2], y: a[3], dir: a[4], hp: a[5], maxhp: a[6], stun: a[7], flash: a[8], w: def.w, h: def.h,
         puffed: !!(a[9] & 1), onGround: !!(a[9] & 2), hard: !!(a[9] & 4), bow: !!(a[9] & 8), charging: a[9] & 16 ? 1 : 0, windup: a[9] & 32 ? 1 : 0, diving: !!(a[9] & 64),
-        calm: a[10], aim: a[11], pop: a[12] < 0 ? undefined : a[12], homeY: a[13], flying: isFlying(a[1]) };
+        calm: a[10], aim: a[11], pop: a[12] < 0 ? undefined : a[12], homeY: a[13], mood: a[14] || null, flying: isFlying(a[1]) };
     });
     this.boss = s.bo;
     const pr = (a) => ({ type: a[0], x: a[1], y: a[2], vx: a[3], vy: a[4], rot: a[5], dir: a[6], age: a[7], life: a[8], color: a[9] || undefined, spin: 0 });
@@ -1319,6 +1445,17 @@ export class Game {
         case 'bubble': ctx.strokeStyle = 'rgba(230,250,255,.9)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(q.x, q.y, 5, 0, Math.PI * 2); ctx.stroke(); break;
         case 'hit': ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; const r1 = 6 + (1 - k) * 10, r2 = 16 + (1 - k) * 18; ctx.moveTo(q.x + Math.cos(a) * r1, q.y + Math.sin(a) * r1); ctx.lineTo(q.x + Math.cos(a) * r2, q.y + Math.sin(a) * r2); } ctx.stroke(); break;
         case 'ring': ctx.strokeStyle = 'rgba(255,230,150,.9)'; ctx.lineWidth = 8 * k; ctx.beginPath(); ctx.ellipse(q.x, q.y - 4, 30 + (1 - k) * 80, 10 + (1 - k) * 18, 0, 0, Math.PI * 2); ctx.stroke(); break;
+        case 'heart': ctx.fillStyle = '#ff4d6a'; ctx.font = '800 20px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('♥', q.x, q.y); break;
+        case 'gas': ctx.fillStyle = 'rgba(170,220,90,.6)'; ctx.beginPath(); ctx.arc(q.x, q.y, 8 + (1 - k) * 22, 0, Math.PI * 2); ctx.fill(); break;
+        case 'note': ctx.fillStyle = q.color || '#ff5fa2'; ctx.font = '800 26px "Baloo 2", sans-serif'; ctx.textAlign = 'center'; ctx.fillText(q.max > 1.3 && Math.floor(q.x) % 2 ? '♫' : '♪', q.x, q.y); break;
+        case 'pan': {
+          // koekenpan die door de lucht zwaait
+          ctx.save(); ctx.translate(q.x, q.y); ctx.scale(q.dir, 1); ctx.rotate(-1.2 + (1 - k) * 2.2);
+          ctx.fillStyle = '#6b4a2e'; ctx.fillRect(-4, 0, 8, 40);
+          ctx.fillStyle = '#2b2f36'; ctx.beginPath(); ctx.ellipse(0, -14, 22, 20, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#4a515c'; ctx.beginPath(); ctx.ellipse(-4, -18, 12, 10, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.restore(); break;
+        }
         case 'slash': ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = 6 * k + 1; ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(q.x - q.dir * 20, q.y, 48, q.dir > 0 ? -1.3 : Math.PI - 0.2, q.dir > 0 ? 0.2 : Math.PI + 1.3); ctx.stroke(); break;
       }
     }

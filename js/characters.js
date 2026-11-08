@@ -20,9 +20,10 @@ export const CHARACTERS = [
   {
     id: 'papa', name: 'Papa', weapon: 'Bierflesjes', kind: 'human', height: 88,
     power: 'Flessenworp',
-    desc: 'Gooit flesjes ver in een boog. Schuim raakt de buren!',
+    desc: 'Gooit flesjes ver in een boog. Schuim raakt de buren! Speciale knop: een enorme boer die vijanden omver blaast.',
     stats: { kracht: 3, bereik: 4, snelheid: 4 },
     attack: { type: 'bottle', cd: 0.40, dmg: 1 },
+    special: { type: 'burp', cd: 3, dmg: 1, name: 'Boer' },
     speed: 320, jump: 770,
     look: {
       skin: '#f0c4a3', skinShade: '#d39d7c', cheek: '#ee9a86', stubble: true,
@@ -35,9 +36,10 @@ export const CHARACTERS = [
   {
     id: 'mama', name: 'Mama', weapon: 'Microfoon', kind: 'human', height: 84,
     power: 'Schreeuwgolf',
-    desc: 'Haar schreeuw gaat dwars door alle vijanden heen.',
+    desc: 'Haar schreeuw gaat dwars door alle vijanden heen. Speciale knop: karaoke! Alle vijanden in beeld gaan dansen.',
     stats: { kracht: 4, bereik: 4, snelheid: 4 },
     attack: { type: 'mic', cd: 0.90, dmg: 2 },
+    special: { type: 'karaoke', cd: 7, name: 'Karaoke' },
     speed: 320, jump: 770,
     look: {
       skin: '#d9a77f', skinShade: '#bb855e', cheek: '#e38e7a',
@@ -60,9 +62,10 @@ export const CHARACTERS = [
   {
     id: 'oma', name: 'Oma', weapon: 'Appeltaart', kind: 'human', height: 80,
     power: 'Taart-in-je-gezicht',
-    desc: 'Taart vol in het gezicht: de vijand ziet even niks!',
+    desc: 'Taart vol in het gezicht: de vijand ziet even niks! Speciale knop: een bol breiwol die vijanden inpakt.',
     stats: { kracht: 4, bereik: 2, snelheid: 2 },
     attack: { type: 'pie', cd: 0.5, dmg: 2 },
+    special: { type: 'yarn', cd: 2.5, dmg: 1, name: 'Breiwol' },
     speed: 255, jump: 745,
     look: {
       skin: '#f3cdb3', skinShade: '#d9aa8d', cheek: '#ef9e93', freckles: true,
@@ -75,9 +78,10 @@ export const CHARACTERS = [
   {
     id: 'opa', name: 'Opa', weapon: 'Moersleutel', kind: 'human', height: 90,
     power: 'Sleutelsmijter',
-    desc: 'Smijt zijn moersleutel. Niet ver, maar keihard.',
+    desc: 'Smijt zijn moersleutel. Niet ver, maar keihard. Speciale knop: Opa doet een dutje en de vijanden om hem heen vallen mee in slaap.',
     stats: { kracht: 5, bereik: 2, snelheid: 2 },
     attack: { type: 'wrench', cd: 0.45, dmg: 3 },
+    special: { type: 'nap', cd: 7, name: 'Dutje' },
     speed: 255, jump: 740,
     look: {
       skin: '#f0c9ad', skinShade: '#d4a184', cheek: '#ec9c8c',
@@ -90,9 +94,10 @@ export const CHARACTERS = [
   {
     id: 'lolo', name: 'Lolo', weapon: 'Hamer', kind: 'human', height: 82,
     power: 'Hamerdreun',
-    desc: 'Dreunt op de grond en raakt vijanden links en rechts.',
+    desc: 'Dreunt op de grond en raakt vijanden links en rechts. Speciale knop: een bananenschil waar vijanden over uitglijden.',
     stats: { kracht: 5, bereik: 1, snelheid: 2 },
     attack: { type: 'hammer', cd: 0.6, dmg: 3 },
+    special: { type: 'peel', cd: 1.5, dmg: 2, name: 'Bananenschil' },
     speed: 255, jump: 740,
     look: {
       skin: '#d6a47c', skinShade: '#b7845d', cheek: '#e08c76', stubble: true,
@@ -105,9 +110,10 @@ export const CHARACTERS = [
   {
     id: 'lola', name: 'Lola', weapon: 'Rijst', kind: 'human', height: 78,
     power: 'Rijstregen',
-    desc: 'Gooit een handvol rijst. Dichtbij raakt bijna elke korrel!',
+    desc: 'Gooit een handvol rijst. Dichtbij raakt bijna elke korrel! Speciale knop: BOING, een klap met de koekenpan.',
     stats: { kracht: 4, bereik: 2, snelheid: 2 },
     attack: { type: 'rice', cd: 0.5, dmg: 0.6 },
+    special: { type: 'pan', cd: 2, dmg: 3, name: 'Koekenpan' },
     speed: 255, jump: 745,
     look: {
       skin: '#dfb08c', skinShade: '#c0906b', cheek: '#e8957f',

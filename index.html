@@ -26,14 +26,25 @@
   <div class="hud-left">
     <div id="hud-hearts"></div>
     <div id="hud-hearts2" class="hidden"></div>
-    <div class="hud-row"><div id="hud-lives"><canvas id="hud-life-ico"></canvas><span id="hud-life-count">×3</span></div>
+    <div class="hud-row"><div id="hud-lives"><canvas id="hud-life-ico"></canvas><canvas id="hud-life-ico2" class="hidden"></canvas><span id="hud-life-count">×3</span></div>
     <div id="hud-coins"><span class="coin-ico">A</span><span id="hud-coin-count">0</span></div></div>
   </div>
   <div id="hud-level"></div>
-  <button id="btn-pause" class="round-btn" aria-label="Pauze">❚❚</button>
+  <div class="hud-right">
+    <button id="btn-ctrl" class="round-btn small-round hidden" aria-label="Knoppen tonen of verbergen"></button>
+    <button id="btn-settings" class="round-btn small-round" aria-label="Instellingen"><svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3h-4l-.4 2.7a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1c.5.4 1.1.8 1.7 1L11 21h4l.4-2.7c.6-.3 1.2-.6 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg></button>
+    <button id="btn-pause" class="round-btn" aria-label="Pauze">❚❚</button>
+  </div>
 </div>
 <div id="boss-bar" class="hidden"><div id="boss-name"></div><div class="bar"><div id="boss-fill"></div></div></div>
 <div id="banner" class="hidden"></div>
+
+<!-- Uitleg controller (in plaats van knoppen in beeld) -->
+<div id="pad-legend" class="hidden">
+  <span class="pl-item"><i class="pb pb-a">A</i>Springen</span>
+  <span class="pl-item"><i class="pb pb-b">B</i>Wapen</span>
+  <span class="pl-item"><i class="pb pb-y">Y</i><span id="pl-special">Special</span></span>
+</div>
 
 <!-- Touch controls -->
 <div id="touch" class="hidden">
@@ -63,7 +74,7 @@
         </div>
       </div>
       <p class="help desktop-only">Laptop: ← → lopen · spatie springen · X of J aanvallen · C of L speciaal · Esc pauze</p>
-      <p class="help pad-only hidden" id="pad-help">🎮 Controller: A springen · B aanvallen · Y speciaal · Menu pauze</p>
+      <p class="help pad-only hidden" id="pad-help">🎮 Controller: A springen · B wapen · Y special · Menu pauze</p>
     </div>
   </section>
 
