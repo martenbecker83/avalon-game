@@ -5,7 +5,7 @@ let music = null;
 let wanted = null; // het nummer dat nu zou moeten spelen (ook als de muziek uit staat)
 
 export function initAudio() {
-  if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
+  if (ac) { if (ac.state === 'suspended') { ac.resume(); claim(); if (!music && wanted && musicOn) playMusic(wanted); } return; }
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return;
   ac = new AC();
@@ -15,8 +15,20 @@ export function initAudio() {
 }
 if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => {
   if (!ac) return;
-  if (document.hidden) ac.suspend?.(); else ac.resume?.();
+  if (document.hidden) ac.suspend?.(); else { ac.resume?.(); claim(); if (!music && wanted && musicOn) playMusic(wanted); }
 });
+// tikken in een tabblad dat even stil was, zet het geluid daar weer aan
+if (typeof window !== 'undefined') window.addEventListener('pointerdown', () => { if (ac && ac.state === 'suspended' && !document.hidden) initAudio(); });
+if (typeof window !== 'undefined') window.addEventListener('pagehide', () => { stopMusic(); ac?.suspend?.(); });
+// Staat het spel in meer tabbladen open? Dan speelt alleen het tabblad dat je gebruikt muziek; de andere zwijgen.
+const me = Math.random().toString(36).slice(2);
+let others = null;
+try { others = new BroadcastChannel('avalon-audio'); } catch { /* oude browser */ }
+function claim() { try { others?.postMessage({ t: 'claim', id: me }); } catch { /* niets */ } }
+if (others) others.onmessage = (e) => {
+  if (e.data?.t !== 'claim' || e.data.id === me) return;
+  stopMusic(); ac?.suspend?.();
+};
 // Volume hard zetten: geleidelijk dempen (setTargetAtTime) werkt op iPad/Safari niet altijd
 function hardSet(param, v) {
   param.cancelScheduledValues(ac.currentTime);
@@ -230,6 +242,7 @@ export function playMusic(name) {
   if (!musicOn) { stopMusic(); return; }
   if (music && music.name === name) return;
   stopMusic();
+  claim();
   const def = SONGS[name] || SONGS.title;
   const song = buildSong(def);
   const step = 60 / def.bpm / 2; // achtsten
