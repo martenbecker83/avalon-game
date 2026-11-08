@@ -142,6 +142,10 @@ export function onPadConnected(fn) { padHint = fn; }
 // ---------- controllers (Gamepad API, standaard-indeling) ----------
 // A = springen · B of X = aanvallen · Y = speciaal · linker stick / pijltjes = lopen · Menu = pauze
 const padPrev = new Map(); // index -> { pause, nav: {...} }
+// Met 1 speler bestuurt maar één controller het spel: de controller die als laatste het menu bediende
+// (of anders de eerste die tijdens het spel een knop indrukt). De andere controller doet dan niets.
+let soloPad = null;
+const anyPressed = (st) => KEYS.some((k) => st[k]) || st.pause || st.up;
 function readPad(gp) {
   const b = (i) => !!gp.buttons[i]?.pressed;
   const ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
@@ -167,8 +171,16 @@ export function pollInput(playing) {
   } else {
     or(merged[0], kbA); or(merged[0], kbB); or(merged[0], touch);
   }
+  if (soloPad !== null && !pads.some((gp) => gp.index === soloPad)) soloPad = null; // controller losgekoppeld
   pads.forEach((gp, i) => {
     const st = readPad(gp);
+    if (inputMode !== 'local2') {
+      if (!playing && anyPressed(st)) soloPad = gp.index;
+      if (playing) {
+        if (soloPad === null && anyPressed(st)) soloPad = gp.index;
+        if (soloPad !== gp.index) { padPrev.set(gp.index, st); return; }
+      }
+    }
     // 2 spelers op één apparaat: twee controllers = elk een eigen speler. Met één controller op een iPad
     // speelt speler 1 met touch en speler 2 met de controller; op een laptop speler 2 met de pijltjes.
     let slot = 0;
