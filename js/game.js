@@ -1268,13 +1268,6 @@ export class Game {
       hurt: p.inv > 1.1 || ended, mic: p.char.attack.type === 'mic' && atk >= 0,
     });
     ctx.restore();
-    // met z'n tweeën: een gekleurd pijltje met 1 of 2 boven je hoofd
-    if (this.multi) {
-      const y = p.y - p.h - 18 + Math.sin(this.t * 4 + p.idx) * 2;
-      ctx.fillStyle = PLAYER_COLORS[p.idx];
-      ctx.beginPath(); ctx.moveTo(p.x - 9, y - 12); ctx.lineTo(p.x + 9, y - 12); ctx.lineTo(p.x, y); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = '#fff'; ctx.font = '800 13px "Baloo 2", sans-serif'; ctx.textAlign = 'center'; ctx.fillText(String(p.idx + 1), p.x, y - 14);
-    }
   }
 
   drawParticles(ctx) {
