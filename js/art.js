@@ -175,7 +175,8 @@ export function drawGround(ctx, wid, g, viewBottom) {
     if (wid === 'water') { ctx.fillStyle = 'rgba(255,255,255,.15)'; for (let px = x + 20; px < x + w; px += 60) { ell(ctx, px, y + 20 + hash(px + 9) * 30, 5, 2, null); ctx.fill(); } }
   }
   // side shading at edges
-  ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.fillRect(x + w - 8, y, 8, (wid === 'sky' ? 60 : bottom - y));
+  // (niet bij zwevende eilanden: daar stak dit randje als een grijs streepje onder het eiland uit)
+  if (wid !== 'sky') { ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.fillRect(x + w - 8, y, 8, bottom - y); }
   // top face (2.5D)
   ctx.fillStyle = P.top;
   ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 6, y - DEPTH); ctx.lineTo(x + w + 6, y - DEPTH); ctx.lineTo(x + w, y); ctx.closePath(); ctx.fill();
