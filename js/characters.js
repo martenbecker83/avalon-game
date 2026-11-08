@@ -110,10 +110,10 @@ export const CHARACTERS = [
   {
     id: 'lola', name: 'Lola', weapon: 'Rijst', kind: 'human', height: 78,
     power: 'Rijstregen',
-    desc: 'Gooit een handvol rijst. Dichtbij raakt bijna elke korrel! Speciale knop: BOING, een klap met de koekenpan.',
+    desc: 'Gooit een handvol rijst. Dichtbij raakt bijna elke korrel! Speciale knop: ze gooit haar koekenpan in een rechte streep. BOING! Die is veel sterker dan rijst.',
     stats: { kracht: 4, bereik: 2, snelheid: 2 },
     attack: { type: 'rice', cd: 0.5, dmg: 0.6 },
-    special: { type: 'pan', cd: 2, dmg: 3, name: 'Koekenpan' },
+    special: { type: 'pan', cd: 1.8, dmg: 3.5, name: 'Koekenpan' },
     speed: 255, jump: 745,
     look: {
       skin: '#dfb08c', skinShade: '#c0906b', cheek: '#e8957f',

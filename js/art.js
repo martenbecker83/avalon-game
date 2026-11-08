@@ -1100,6 +1100,16 @@ export function drawProjectile(ctx, p, t) {
       ell(ctx, 0, -3, 3, 2, '#6b4a10');
       break;
     }
+    case 'pan': {
+      // draaiende koekenpan (Lola)
+      ctx.rotate(p.rot || 0);
+      ctx.fillStyle = '#6b4a2e'; ctx.fillRect(14, -3.5, 24, 7);
+      ctx.fillStyle = '#3a2716'; ctx.fillRect(34, -3.5, 4, 7);
+      ell(ctx, 0, 0, 17, 17, '#2b2f36');
+      ell(ctx, 0, 0, 13, 13, '#3d434d');
+      ell(ctx, -4, -4, 6, 5, 'rgba(255,255,255,.18)');
+      break;
+    }
     case 'rice': ell(ctx, 0, 0, 3.4, 1.8, '#fffdf2', Math.atan2(p.vy, p.vx)); ctx.strokeStyle = 'rgba(160,150,120,.6)'; ctx.lineWidth = 0.6; ctx.stroke(); break;
     case 'warn': {
       ctx.globalAlpha = 0.4 + Math.sin(t * 20) * 0.3;

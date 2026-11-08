@@ -534,13 +534,9 @@ export class Game {
       p.atkT = p.atkDur = 0.25; sfx.throw();
       this.projectiles.push({ type: 'peel', x: p.x + p.dir * 20, y: p.y - p.h * 0.6, vx: p.dir * 260, vy: -260, g: 1400, life: 10, age: 0, dmg: s.dmg, rot: 0, spin: p.dir * 10, w: 34, h: 16, hit: new Set(), stun: 1.4, mood: 'slip', peel: true, owner: p });
     } else if (s.type === 'pan') {
-      // Lola geeft een BOING met de koekenpan: de vijand wordt even zo plat als een pannenkoek
-      p.atkT = p.atkDur = 0.3; sfx.boing();
-      const box = { l: p.x + (p.dir > 0 ? -4 : -80), r: p.x + (p.dir > 0 ? 80 : 4), t: p.y - p.h - 20, b: p.y + 6 };
-      let hit = false;
-      for (const e of this.targets()) if (overlap(box, this.boxOf(e))) { this.damage(e, s.dmg, { fromX: p.x, stun: 1.6, mood: 'flat' }); hit = true; }
-      this.particles.push({ kind: 'pan', x: p.x + p.dir * 44, y: p.y - p.h * 0.6, dir: p.dir, life: 0.3, max: 0.3 });
-      if (hit) this.texts.push({ x: p.x + p.dir * 50, y: p.y - p.h - 20, text: 'BOING!', life: 0.9, vy: -60, color: '#ffd34d' });
+      // Lola gooit haar koekenpan in één rechte streep: alles wat hij raakt wordt even zo plat als een pannenkoek
+      p.atkT = p.atkDur = 0.3; sfx.throw();
+      this.projectiles.push({ type: 'pan', x: p.x + p.dir * 24, y: p.y - p.h * 0.55, vx: p.dir * 680, vy: 0, g: 0, life: 0.95, age: 0, dmg: s.dmg, rot: 0, spin: p.dir * 16, w: 44, h: 44, hit: new Set(), pierce: true, stun: 1.6, mood: 'flat', owner: p });
     }
   }
 
@@ -662,6 +658,7 @@ export class Game {
           if (q.type === 'wrench') sfx.clang();
           if (q.type === 'chalk') { sfx.chalkHit(); this.chalkDust(q.x, q.y, q.color); }
           if (q.type === 'hairball') { sfx.splat(); this.splat(q.x, q.y, '#b8a080'); }
+          if (q.type === 'pan') { sfx.boing(); this.shake = Math.max(this.shake, 3); this.texts.push({ x: q.x, y: q.y - 40, text: 'BOING!', life: 0.9, vy: -60, color: '#ffd34d' }); }
           if (q.type === 'rice') this.particles.push({ kind: 'spark', x: q.x, y: q.y, vx: (Math.random() - 0.5) * 120, vy: -Math.random() * 120, life: 0.3, max: 0.3, color: '#fffdf2' });
           if (!q.pierce) { q.dead = true; break; }
         }
