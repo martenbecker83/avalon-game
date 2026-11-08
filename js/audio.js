@@ -2,6 +2,7 @@
 let ac = null, master = null, musicGain = null, sfxGain = null;
 let musicOn = true, sfxOn = true;
 let music = null;
+let wanted = null; // het nummer dat nu zou moeten spelen (ook als de muziek uit staat)
 
 export function initAudio() {
   if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
@@ -16,13 +17,23 @@ if (typeof document !== 'undefined') document.addEventListener('visibilitychange
   if (!ac) return;
   if (document.hidden) ac.suspend?.(); else ac.resume?.();
 });
+// Volume hard zetten: geleidelijk dempen (setTargetAtTime) werkt op iPad/Safari niet altijd
+function hardSet(param, v) {
+  param.cancelScheduledValues(ac.currentTime);
+  param.value = v;
+  param.setValueAtTime(v, ac.currentTime);
+}
 export function setMusic(on) {
   musicOn = on;
-  if (musicGain) musicGain.gain.setTargetAtTime(on ? 0.32 : 0, ac.currentTime, 0.05);
+  if (!ac) return;
+  hardSet(musicGain.gain, on ? 0.32 : 0);
+  // muziek uit = de muziek echt stoppen, niet alleen zachter zetten
+  if (!on) stopMusic();
+  else if (wanted) playMusic(wanted);
 }
 export function setSfx(on) {
   sfxOn = on;
-  if (sfxGain) sfxGain.gain.setTargetAtTime(on ? 0.7 : 0, ac.currentTime, 0.05);
+  if (sfxGain) hardSet(sfxGain.gain, on ? 0.7 : 0);
 }
 
 function noiseBuffer() {
@@ -206,7 +217,9 @@ function buildSong(def) {
 
 export function playMusic(name) {
   if (tap) tap('music:' + name);
+  wanted = name;
   if (!ac) return;
+  if (!musicOn) { stopMusic(); return; }
   if (music && music.name === name) return;
   stopMusic();
   const def = SONGS[name] || SONGS.title;

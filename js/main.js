@@ -486,7 +486,7 @@ function buildWorlds() {
   const cs = runChars();
   $('#world-sub').innerHTML = run ? `<span class="chip">${cs.map((c, i) => `<canvas class="chip-ico" data-i="${i}"></canvas>`).join('')}${cs.map((c) => esc(c.name)).join(' & ')}</span>
     <span class="chip"><span class="coin-ico">A</span>${run.coins}</span>
-    <span class="chip" title="levens">${cs.map((c, i) => `<canvas class="chip-ico" data-life="${i}"></canvas>`).join('')}×${run.lives}</span>` : '';
+    <span class="chip" title="levens">${cs.map((c, i) => `<canvas class="chip-ico" data-life="${i}"></canvas>`).join('')}×${run.lives}</span>${run.mode === 'local2' ? '<span class="chip">🎮 Speler 1 kiest</span>' : ''}` : '';
   if (run) { document.querySelectorAll('#world-sub canvas[data-i]').forEach((cv) => renderHead(cv, cs[+cv.dataset.i], 30)); document.querySelectorAll('#world-sub canvas[data-life]').forEach((cv) => renderHead(cv, cs[+cv.dataset.life], 30)); }
   WORLDS.forEach((w, idx) => {
     const got = done.includes(w.id);
@@ -662,10 +662,28 @@ $('#btn-settings').addEventListener('click', () => {
   if (mode !== 'play' || !$('#modal').classList.contains('hidden')) return;
   sfx.click(); openSettings();
 });
+// 2 spelers op één apparaat: bij welke speler hoort deze controller? (zelfde indeling als in input.js)
+function padSlot(padIdx) {
+  return connectedPads().length >= 2 ? Math.min(padIdx, 1) : (isTouch() ? 1 : 0);
+}
+let iniOwner = null; // 0/1 = alleen die speler mag nu initialen intikken (2 spelers op één apparaat)
+// Wie mag het menu nu bedienen? null = iedereen
+function menuOwner() {
+  if (iniOwner !== null) return iniOwner;
+  if (run?.mode === 'local2' && !$('#scr-worlds').classList.contains('hidden')) return 0; // alleen speler 1 kiest de wereld
+  return null;
+}
+// Op een iPad met één controller tikt speler 1 op het scherm en heeft speler 2 de controller:
+// is speler 2 aan de beurt, dan telt tikken op het scherm niet mee.
+function touchBlocked(e) {
+  return e.isTrusted && menuOwner() === 1 && isTouch() && connectedPads().length === 1;
+}
 initInput(pause, (dir, padIdx) => {
   if (mode === 'play') return;
   const choosing = party.mode === 'local2' && !$('#scr-chars').classList.contains('hidden') && $('#modal').classList.contains('hidden');
   if (choosing && connectedPads().length >= 2 && padIdx !== party.slot) return;
+  const owner = menuOwner();
+  if (owner !== null && padSlot(padIdx) !== owner) return;
   spatialNav(dir);
 });
 // tik of muis: de gele controller-rand is dan niet nodig
@@ -684,12 +702,13 @@ function closeModal() { $('#modal').classList.add('hidden'); modalHandler = null
 function focusFirst() { if (!connectedPads().length) return; requestAnimationFrame(() => $('#modal-card').querySelector('button:not([disabled])')?.focus()); }
 $('#modal').addEventListener('click', (e) => {
   const b = e.target.closest('[data-act]');
-  if (b && modalHandler) { sfx.click(); modalHandler(b.dataset.act, b); }
+  if (b && modalHandler && !touchBlocked(e)) { sfx.click(); modalHandler(b.dataset.act, b); }
 });
 
 // ---------- initialen intikken ----------
 // Vraagt 3 letters; who = 'Speler 1' / 'Speler 2' of '' (1 speler)
-function askInitials({ title, sub, score, done, faces, who, start }, onSave) {
+function askInitials({ title, sub, score, done, faces, who, start, owner = null }, onSave) {
+  iniOwner = owner;
   let ini = (start || '').slice(0, 3).split('');
   const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
   const render = () => {
@@ -704,13 +723,13 @@ function askInitials({ title, sub, score, done, faces, who, start }, onSave) {
       <div class="keyboard">${letters.map((l) => `<button data-act="k" data-l="${l}">${l}</button>`).join('')}<button class="wide" data-act="del">⌫ Wis</button></div>
       <div class="menu"><button class="big-btn" data-act="save" ${ini.length ? '' : 'disabled'}>Opslaan</button></div>
     `, (act, btn) => {
-      if (act === 'k' && ini.length < 3) { ini.push(btn.dataset.l); render(); if (ini.length === 3) $('[data-act="save"]')?.focus(); }
+      if (act === 'k' && ini.length < 3) { ini.push(btn.dataset.l); render(); if (ini.length === 3) requestAnimationFrame(() => requestAnimationFrame(() => $('[data-act="save"]')?.focus())); }
       if (act === 'del') { ini.pop(); render(); }
       if (act === 'save' && ini.length) save();
     });
     document.querySelectorAll('#modal-card .modal-portrait').forEach((cv, i) => renderPortrait(cv, faces[i], { w: 80, h: 80 }));
   };
-  const save = () => { window.removeEventListener('keydown', onKey); onSave(ini.join('')); };
+  const save = () => { window.removeEventListener('keydown', onKey); iniOwner = null; onSave(ini.join('')); };
   const onKey = (e) => {
     if (!$('.ini-boxes')) return;
     if (/^[a-z]$/i.test(e.key) && ini.length < 3) { ini.push(e.key.toUpperCase()); render(); }
@@ -755,11 +774,12 @@ function endRun(kind, opts = {}) {
     show('scores');
   };
   const ask = () => {
-    askInitials({ ...base, who: duo ? 'Speler 1' : '', start: settings.initials }, (a) => {
+    const local2 = duo && finished.mode === 'local2';
+    askInitials({ ...base, who: duo ? 'Speler 1' : '', start: settings.initials, owner: local2 ? 0 : null }, (a) => {
       settings.initials = a; store.setSettings({ initials: a });
       if (!duo) { finish([a]); return; }
       if (finished.mode === 'local2') {
-        askInitials({ ...base, who: 'Speler 2', start: settings.initials2 }, (b) => {
+        askInitials({ ...base, who: 'Speler 2', start: settings.initials2, owner: 1 }, (b) => {
           settings.initials2 = b; store.setSettings({ initials2: b });
           finish([a, b]);
         });
