@@ -12,7 +12,8 @@ import { drawWorldPreview, drawBackground, drawGround } from './art.js';
 import { Game, PLAYER_COLORS } from './game.js';
 import { createFinale } from './finale.js';
 import { initInput, isTouch, clearPressed, controllers, remote, pollInput, setInputMode, spatialNav, onPadConnected, connectedPads, checkPadCount, onPadCountChange } from './input.js';
-import { initAudio, setMusic, setSfx, sfx, playMusic, setSfxTap, countOpenGames } from './audio.js';
+import { initAudio, setMusic, setSfx, sfx, playMusic, setSfxTap, countOpenGames, AUDIO_VERSION } from './audio.js';
+const GAME_VERSION = '8 nov 15:05';
 import { Net } from './net.js';
 import * as store from './storage.js';
 
@@ -645,6 +646,7 @@ function openSettings(back = null) {
       ${row('🔊 Geluidseffecten', 'sfx', settings.sfx)}
       ${inGame && isTouch() ? row('👆 Knoppen in beeld', 'buttons', buttonsOn) : ''}
       <p id="open-games" class="hidden" style="font-size:.85em;color:#c0392b;margin:6px 0 0"></p>
+      <p style="font-size:.7em;opacity:.45;margin:4px 0 0">versie ${GAME_VERSION} · geluid ${AUDIO_VERSION}${window.navigator.standalone ? ' · beginscherm' : ''}</p>
       <div class="menu"><button class="big-btn" data-act="close">${back ? 'Terug' : inGame ? 'Verder spelen' : 'Klaar'}</button></div>`, (act) => {
       if (act === 'music') { toggleMusic(); render('music'); }
       if (act === 'sfx') { toggleSfx(); render('sfx'); }

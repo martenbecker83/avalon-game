@@ -1,4 +1,5 @@
 // Muziek en geluidseffecten, volledig gesynthetiseerd met WebAudio (geen bestanden nodig)
+export const AUDIO_VERSION = '8 nov 15:05';
 let ac = null, master = null, musicGain = null, sfxGain = null;
 let musicOn = true, sfxOn = true;
 let music = null;

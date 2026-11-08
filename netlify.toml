@@ -7,3 +7,9 @@
   for = "/js/*"
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
+
+# beginscherm-apps op de iPad bewaren bestanden graag lang: altijd eerst controleren of er een nieuwe versie is
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cache-Control = "no-cache"
