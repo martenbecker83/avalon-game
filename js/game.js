@@ -1,19 +1,23 @@
-// Gameplay: speler, vijanden, wapens, bazen, camera en tekenen
-import { drawCharacter } from './characters.js';
-import { WORLDS, ENEMY_TYPES, GROUND_Y, PEOPLE, generateLevel, bossSpec } from './worlds.js';
+// Gameplay: spelers (1 of 2), vijanden, wapens, bazen, camera en tekenen
+import { drawCharacter, charById, CHALK_COLORS } from './characters.js';
+import { WORLDS, ENEMY_TYPES, GROUND_Y, PEOPLE, generateLevel, bossSpec, isFlying } from './worlds.js';
 import {
   drawBackground, drawGround, drawPlat, drawDeco, drawToken, drawHeart, drawCoin, drawCheckpoint, drawPortal,
-  drawCage, drawFreedPeople, drawEnemy, drawBoss, drawProjectile, BOSS_SIZE, DEPTH,
+  drawCage, drawFreedPeople, drawEnemy, drawBoss, drawProjectile, drawBow, BOSS_SIZE,
 } from './art.js';
-import { keys, consume } from './input.js';
 import { sfx, playMusic } from './audio.js';
 
 const VIEW_H = 540;
 const MAX_HEARTS = 3;
 const COIN_NORMAL = 1, COIN_HARD = 2, COIN_TOKEN = 5;
+const MAX_ZOOM = 1.45;          // zo ver zoomt de camera uit als twee spelers uit elkaar lopen
+const LEAD = 0.3;               // de achterste speler staat op 30% van het beeld
+export const PLAYER_COLORS = ['#3a8ee8', '#ff8a2a'];
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const overlap = (a, b) => a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t;
+const R = (v) => Math.round(v);
+const R1 = (v) => Math.round(v * 10) / 10;
 
 export class Game {
   constructor(canvas, hooks) {
@@ -22,8 +26,13 @@ export class Game {
     this.hooks = hooks;
     this.t = 0;
     this.running = false;
+    this.zoom = 1;
+    this.players = [];
+    this.leashW = null; // smalste scherm van beide apparaten (online samen spelen)
     this.resize();
   }
+
+  get p() { return this.players[0]; }
 
   resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -31,29 +40,41 @@ export class Game {
     // waardoor het beeld uitgerekt en wazig werd
     const w = this.cv.clientWidth || window.innerWidth, h = this.cv.clientHeight || window.innerHeight;
     this.cv.width = Math.round(w * dpr); this.cv.height = Math.round(h * dpr);
-    this.scale = (h * dpr) / VIEW_H;
-    this.viewW = (w * dpr) / this.scale;
+    let scale = (h * dpr) / VIEW_H;
+    let viewW = (w * dpr) / scale;
     // keep a minimum view width on portrait screens
-    if (this.viewW < 620) { this.scale = (w * dpr) / 620; this.viewW = 620; }
-    this.viewH = (h * dpr) / this.scale;
+    if (viewW < 620) { scale = (w * dpr) / 620; viewW = 620; }
+    this.baseScale = scale; this.baseViewW = viewW; this.baseViewH = (h * dpr) / scale;
+    this.applyZoom();
+  }
+  applyZoom() {
+    this.scale = this.baseScale / this.zoom;
+    this.viewW = this.baseViewW * this.zoom;
+    this.viewH = this.baseViewH * this.zoom;
   }
 
   // ---------- setup ----------
-  start({ worldIdx, level, checkpoint, coins, char, lives = 3 }) {
+  // chars: één of twee personages; ctls: de bijbehorende controllers; mirror: alleen tonen (tweede apparaat)
+  start({ worldIdx, level, checkpoint, coins, chars, ctls, lives = 3, mirror = false }) {
     this.lives = lives;
     this.worldIdx = worldIdx; this.world = WORLDS[worldIdx];
-    this.char = char;
+    this.chars = chars; this.ctls = ctls || [];
+    this.mirror = mirror;
     this.level = level;
     this.coins = coins;
     this.coinsAtCp = coins;
     this.checkpoint = checkpoint; // 0 = start, 1 / 2
     this.lv = generateLevel(worldIdx, level);
+    this.zoom = 1; this.applyZoom();
     this.buildState();
     this.running = true; this.paused = false;
-    playMusic(this.world.music);
-    this.hooks.onBanner(`${this.world.name}`, `Level ${level}`);
-    this.hud();
+    if (!mirror) {
+      playMusic(this.world.music);
+      this.hooks.onBanner(`${this.world.name}`, `Level ${level}`);
+      this.hud();
+    }
   }
+  get multi() { return this.players.length > 1; }
 
   buildState() {
     const lv = this.lv;
@@ -63,20 +84,24 @@ export class Game {
     this.hearts = lv.hearts.filter((p) => p.x > cpX).map((p) => ({ ...p, got: false }));
     this.plats = lv.plats.map((p) => ({ ...p, ox: p.x, oy: p.y, dx: 0, dy: 0, squash: 0 }));
     this.projectiles = []; this.hostile = []; this.particles = []; this.texts = [];
-    this.boss = null; this.bossDone = false; this.portal = null; this.people = null; this.cageOpen = false;
+    this.boss = null; this.bossDone = false; this.portal = null; this.people = null; this.cageOpen = false; this.cage = null;
     this.arenaLocked = false; this.phase = 'play'; this.phaseT = 0;
     this.shake = 0;
     const spawn = this.checkpoint > 0 ? lv.checkpoints[this.checkpoint - 1] : { x: 120, y: GROUND_Y };
-    const d = this.char;
-    this.p = {
-      x: spawn.x + 30, y: spawn.y - 2, vx: 0, vy: 0, dir: 1,
+    this.players = this.chars.map((d, i) => this.makePlayer(d, i, spawn.x + 30 - i * 50, spawn.y));
+    this.zoom = 1; this.applyZoom();
+    this.cam = { x: Math.max(0, Math.min(...this.players.map((p) => p.x)) - this.viewW * 0.35), y: GROUND_Y - (this.viewH - 100) };
+    if (!this.mirror) this.hooks.onBossBar(null);
+  }
+  makePlayer(d, i, x, y) {
+    return {
+      idx: i, char: d, ctl: this.ctls[i],
+      x, y: y - 2, vx: 0, vy: 0, dir: 1,
       w: d.kind === 'cat' ? 44 : 28, h: d.height * (d.kind === 'cat' ? 0.95 : 0.98),
       onGround: false, coyote: 0, jumpBuf: 0, jumpsLeft: 1, swimCd: 0, cut: false,
-      hearts: MAX_HEARTS, inv: 1.0, atkT: 0, atkDur: 0.25, cd: 0, walk: 0, standOn: null,
-      safe: { x: spawn.x, y: spawn.y },
+      hearts: MAX_HEARTS, inv: 1.0, atkT: 0, atkDur: 0.25, cd: 0, cd2: 0, spitT: 0, walk: 0, standOn: null,
+      safe: { x, y }, down: 0, pendingHammer: null,
     };
-    this.cam = { x: Math.max(0, this.p.x - this.viewW * 0.35), y: GROUND_Y - (this.viewH - 100) };
-    this.hooks.onBossBar(null);
   }
 
   makeEnemy(spec) {
@@ -85,11 +110,17 @@ export class Game {
       ...spec, def, hp: def.hp, maxhp: def.hp, w: def.w, h: def.h, home: spec.x, homeY: spec.y,
       vx: 0, vy: 0, dir: -1, t: Math.random() * 6, stun: 0, flash: 0, dead: false, onGround: false,
       windup: 0, charging: 0, cool: 1 + Math.random() * 2, aim: 0, puffed: false,
-      flying: ['flyer', 'floater', 'puffer'].includes(def.behavior),
+      flying: isFlying(spec.type), calm: 0, bow: false,
+      state: 'idle', pop: def.behavior === 'popper' ? 0 : undefined, diving: false,
     };
   }
 
-  hud() { this.hooks.onHud({ hearts: this.p.hearts, max: MAX_HEARTS, lives: this.lives, coins: this.coins, label: `${this.world.name} · Level ${this.level}` }); }
+  hud() {
+    this.hooks.onHud({
+      players: this.players.map((p) => ({ hearts: p.down ? 0 : p.hearts, char: p.char.id, down: !!p.down })),
+      max: MAX_HEARTS, lives: this.lives, coins: this.coins, label: `${this.world.name} · Level ${this.level}`,
+    });
+  }
 
   addCoins(n, x, y) {
     this.coins += n;
@@ -108,16 +139,29 @@ export class Game {
     for (const g of this.lv.grounds) if (x >= g.x && x <= g.x + g.w) return g.y;
     return null;
   }
+  live() { return this.players.filter((p) => !p.down); }
+  nearestPlayer(x, y = 0) {
+    let best = null, bd = Infinity;
+    for (const p of this.live()) { const d = Math.abs(p.x - x) + Math.abs(p.y - y) * 0.5; if (d < bd) { bd = d; best = p; } }
+    return best || this.players[0];
+  }
+  rear() { const l = this.live(); return l.length ? l.reduce((a, b) => (b.x < a.x ? b : a)) : this.players[0]; }
 
   // ---------- update ----------
   update(dt) {
     if (!this.running || this.paused) return;
     dt = Math.min(dt, 1 / 30);
+    if (this.mirror) { this.updateMirror(dt); return; }
     this.t += dt;
     this.phaseT += dt;
     this.updatePlats(dt);
-    if (this.phase === 'play' || this.phase === 'boss' || this.phase === 'cleared') this.updatePlayer(dt);
-    else if (this.phase === 'freed' || this.phase === 'freeing') this.updatePlayer(dt, true);
+    const cut = this.phase === 'freed' || this.phase === 'freeing';
+    if (this.phase === 'play' || this.phase === 'boss' || this.phase === 'cleared' || cut) {
+      for (const p of this.players) if (!p.down) this.updatePlayer(p, dt, cut);
+      this.updateDown(dt);
+      if (this.multi) this.leash();
+      for (const p of this.live()) this.playerTriggers(p);
+    }
     this.updateEnemies(dt);
     this.updateBoss(dt);
     this.updateProjectiles(dt);
@@ -141,10 +185,12 @@ export class Game {
     }
   }
 
-  updatePlayer(dt, cutscene = false) {
-    const p = this.p, d = this.char, ph = this.world.physics;
-    const L = !cutscene && keys.left, R = !cutscene && keys.right;
-    const target = (R ? 1 : 0) - (L ? 1 : 0);
+  updatePlayer(p, dt, cutscene = false) {
+    const d = p.char, ph = this.world.physics;
+    const keys = p.ctl ? p.ctl.keys : {};
+    const consume = (k) => (p.ctl ? p.ctl.consume(k) : false);
+    const L = !cutscene && keys.left, Rt = !cutscene && keys.right;
+    const target = (Rt ? 1 : 0) - (L ? 1 : 0);
     const accel = p.onGround ? 2600 : 1700;
     const maxV = d.speed;
     if (target) { p.vx += target * accel * dt; p.dir = target; }
@@ -169,10 +215,13 @@ export class Game {
     }
     if (!keys.jump && p.vy < -260 && !p.cut && !ph.swim) { p.vy *= 0.55; p.cut = true; }
 
-    // attack
-    p.cd -= dt;
+    // attack + speciale aanval
+    p.cd -= dt; p.cd2 -= dt;
     if (p.atkT > 0) p.atkT -= dt;
-    if (!cutscene && (consume('attack') || (keys.attack && d.attack.type === 'claws')) && p.cd <= 0) this.attack();
+    if (p.spitT > 0) p.spitT -= dt;
+    if (!cutscene && (consume('attack') || (keys.attack && d.attack.type === 'claws')) && p.cd <= 0) this.attack(p);
+    if (!cutscene && consume('special') && d.special && p.cd2 <= 0) this.special(p);
+    if (p.pendingHammer !== null) { p.pendingHammer -= dt; if (p.pendingHammer <= 0) { p.pendingHammer = null; this.hammerHit(p); } }
 
     // gravity
     p.vy += ph.gravity * dt * (ph.swim && keys.jump ? 0.75 : 1);
@@ -184,14 +233,7 @@ export class Game {
     // move X
     const prevB = p.y;
     p.x += p.vx * dt;
-    const bx = () => ({ l: p.x - p.w / 2, r: p.x + p.w / 2, t: p.y - p.h, b: p.y });
-    for (const g of this.solidsNear(p.x - 60, p.x + 60)) {
-      const box = bx(); const gb = { l: g.x, r: g.x + g.w, t: g.y, b: 99999 };
-      if (overlap(box, gb) && box.b > g.y + 6) {
-        if (p.vx > 0 || p.x < g.x) p.x = g.x - p.w / 2 - 0.01; else p.x = g.x + g.w + p.w / 2 + 0.01;
-        p.vx = 0;
-      }
-    }
+    this.collideX(p);
     // arena walls & level bounds
     const minX = this.arenaLocked ? this.lv.arena.x + 20 : 20;
     const maxX = this.arenaLocked && !this.bossDone ? this.lv.arena.x + this.lv.arena.w - 20 : this.lv.length - 40;
@@ -202,6 +244,7 @@ export class Game {
     p.y += p.vy * dt;
     const wasGround = p.onGround;
     p.onGround = false; p.standOn = null;
+    const bx = () => ({ l: p.x - p.w / 2, r: p.x + p.w / 2, t: p.y - p.h, b: p.y });
     for (const g of this.solidsNear(p.x - 30, p.x + 30)) {
       const box = bx(); const gb = { l: g.x, r: g.x + g.w, t: g.y, b: 99999 };
       if (overlap(box, gb)) {
@@ -232,19 +275,48 @@ export class Game {
 
     // fall in pit
     if (p.y > GROUND_Y + 320) {
-      this.hurt(true);
-      if (this.p.hearts > 0) {
+      this.hurt(p, true);
+      if (p.hearts > 0 && !p.down) {
         // start een stukje terug van de rand, zodat je niet meteen weer valt
         const back = Math.sign(p.vx) || p.dir;
         const g = this.lv.grounds.find((gg) => p.safe.x >= gg.x - 2 && p.safe.x <= gg.x + gg.w + 2);
         let nx = p.safe.x - back * 110, ny = p.safe.y;
         if (g) { nx = clamp(nx, g.x + 30, g.x + g.w - 30); ny = g.y; }
+        // met z'n tweeën: kom terug naast je maatje
+        const mate = this.players.find((o) => o !== p && !o.down && o.onGround);
+        if (mate) { nx = mate.x - mate.dir * 40; ny = mate.y; }
         p.x = nx; p.y = ny - 2; p.vx = 0; p.vy = 0; p.dir = back;
       }
     }
 
     if (p.inv > 0) p.inv -= dt;
+  }
+  collideX(p) {
+    for (const g of this.solidsNear(p.x - 60, p.x + 60)) {
+      const box = { l: p.x - p.w / 2, r: p.x + p.w / 2, t: p.y - p.h, b: p.y }; const gb = { l: g.x, r: g.x + g.w, t: g.y, b: 99999 };
+      if (overlap(box, gb) && box.b > g.y + 6) {
+        if (p.vx > 0 || p.x < g.x) p.x = g.x - p.w / 2 - 0.01; else p.x = g.x + g.w + p.w / 2 + 0.01;
+        p.vx = 0;
+      }
+    }
+  }
 
+  // De achterste speler bepaalt waar je bent: de voorste kan niet verder dan de rand van het (uitgezoomde) beeld
+  leash() {
+    const l = this.live(); if (l.length < 2) return;
+    const w = Math.min(this.baseViewW, this.leashW || Infinity);
+    const maxSpread = (1 - LEAD) * w * MAX_ZOOM - 50;
+    const rear = l.reduce((a, b) => (b.x < a.x ? b : a));
+    for (const p of l) {
+      if (p !== rear && p.x > rear.x + maxSpread) { p.x = rear.x + maxSpread; p.vx = Math.min(0, p.vx); this.collideX(p); }
+    }
+    // in de lucht ook niet te ver uit elkaar (vooral onderwater en in de lucht-wereld)
+    const top = Math.min(...l.map((p) => p.y - p.h)), bot = Math.max(...l.map((p) => p.y));
+    const maxH = this.baseViewH * MAX_ZOOM - 140;
+    if (bot - top > maxH) { const hi = l.find((p) => p.y - p.h === top); if (hi && hi.vy < 0) hi.vy = 0; }
+  }
+
+  playerTriggers(p) {
     // checkpoints
     this.lv.checkpoints.forEach((c, i) => {
       if (i + 1 > this.checkpoint && p.x > c.x - 10) {
@@ -255,7 +327,6 @@ export class Game {
         this.hooks.onCheckpoint({ level: this.level, checkpoint: this.checkpoint, coins: this.coins, lives: this.lives });
       }
     });
-
     // arena trigger
     const a = this.lv.arena;
     if (!this.arenaLocked && p.x > a.x + 140 && this.phase === 'play') this.startBoss();
@@ -269,71 +340,138 @@ export class Game {
     for (let i = 0; i < n; i++) this.particles.push({ kind: 'dust', x: x + (Math.random() - 0.5) * 20, y, vx: (Math.random() - 0.5) * 120, vy: -Math.random() * 60, life: 0.45, max: 0.45 });
   }
 
-  hurt(fall = false) {
-    const p = this.p;
+  hurt(p, fall = false) {
+    if (p.down) return;
     if (!fall && p.inv > 0) return;
     p.hearts--; p.inv = 1.4;
     sfx.hurt();
     this.shake = 8;
     if (!fall) { p.vy = -380; p.vx = -p.dir * 260; }
     this.hud();
-    if (p.hearts <= 0) {
-      this.lives--;
-      this.phase = this.lives > 0 ? 'dead' : 'gameover'; this.phaseT = 0;
-      if (this.lives > 0) {
-        this.hooks.onBanner('Oeps!', this.lives === 1 ? 'Nog 1 leven' : `Nog ${this.lives} levens`, 1600);
-        this.hooks.onLifeLost({ level: this.level, checkpoint: this.checkpoint, coins: this.coinsAtCp, lives: this.lives });
-      } else this.hooks.onBanner('Game over', null, 1800);
-      sfx.gameOver();
+    if (p.hearts > 0) return;
+    this.lives--;
+    sfx.gameOver();
+    const others = this.players.filter((o) => o !== p && !o.down);
+    if (this.lives <= 0) {
+      this.phase = 'gameover'; this.phaseT = 0;
+      this.hooks.onBanner('Game over', null, 1800);
+    } else if (others.length) {
+      // met z'n tweeën: je komt zo terug naast je maatje
+      p.down = 1.8; p.vx = 0; p.vy = 0;
+      for (let i = 0; i < 12; i++) this.particles.push({ kind: 'puff', x: p.x, y: p.y - p.h / 2, vx: (Math.random() - 0.5) * 200, vy: -Math.random() * 200, life: 0.6, max: 0.6 });
+      this.hooks.onBanner(`Oeps, ${p.char.name}!`, this.lives === 1 ? 'Nog 1 leven' : `Nog ${this.lives} levens`, 1600);
+      this.hooks.onLifeLost({ level: this.level, checkpoint: this.checkpoint, coins: this.coins, lives: this.lives });
+    } else {
+      this.phase = 'dead'; this.phaseT = 0;
+      this.hooks.onBanner('Oeps!', this.lives === 1 ? 'Nog 1 leven' : `Nog ${this.lives} levens`, 1600);
+      this.hooks.onLifeLost({ level: this.level, checkpoint: this.checkpoint, coins: this.coinsAtCp, lives: this.lives });
+    }
+    this.hud();
+  }
+  updateDown(dt) {
+    for (const p of this.players) {
+      if (!p.down) continue;
+      p.down -= dt;
+      if (p.down > 0) continue;
+      const mate = this.players.find((o) => o !== p && !o.down);
+      if (!mate) { p.down = 0.2; continue; }
+      p.down = 0; p.hearts = MAX_HEARTS; p.inv = 2;
+      const gy = mate.onGround ? mate.y : (this.groundBelow(mate.safe.x, mate.safe.y - 4) ?? mate.safe.y);
+      p.x = mate.onGround ? mate.x - mate.dir * 40 : mate.safe.x; p.y = gy - 2; p.vx = 0; p.vy = -200; p.dir = mate.dir;
+      for (let i = 0; i < 14; i++) this.particles.push({ kind: 'spark', x: p.x, y: p.y - 30, vx: (Math.random() - 0.5) * 260, vy: -Math.random() * 260, life: 0.7, max: 0.7, color: PLAYER_COLORS[p.idx] });
       this.hud();
     }
   }
 
   // ---------- attacks ----------
-  attack() {
-    const p = this.p, a = this.char.attack;
+  attack(p) {
+    const a = p.char.attack;
     p.cd = a.cd;
     const mx = p.x + p.dir * 12, my = p.y - p.h * 0.62;
     switch (a.type) {
       case 'sword':
         p.atkT = p.atkDur = 0.22; sfx.swish();
-        this.melee({ l: p.x + (p.dir > 0 ? -6 : -82), r: p.x + (p.dir > 0 ? 82 : 6), t: p.y - p.h - 26, b: p.y + 6 }, a.dmg, 'sword');
+        this.melee(p, { l: p.x + (p.dir > 0 ? -6 : -82), r: p.x + (p.dir > 0 ? 82 : 6), t: p.y - p.h - 26, b: p.y + 6 }, a.dmg, 'sword');
         break;
       case 'claws':
         p.atkT = p.atkDur = 0.14; if (Math.random() < 0.3) sfx.meow(); else sfx.swish();
-        this.melee({ l: p.x + (p.dir > 0 ? 0 : -64), r: p.x + (p.dir > 0 ? 64 : 0), t: p.y - p.h - 14, b: p.y + 4 }, a.dmg, 'claws');
+        this.melee(p, { l: p.x + (p.dir > 0 ? 0 : -64), r: p.x + (p.dir > 0 ? 64 : 0), t: p.y - p.h - 14, b: p.y + 4 }, a.dmg, 'claws');
         break;
       case 'hammer':
         p.atkT = p.atkDur = 0.32; sfx.swish();
-        this.pendingHammer = 0.17;
+        p.pendingHammer = 0.17;
         break;
       case 'mic':
         p.atkT = p.atkDur = 0.55; sfx.scream();
-        this.projectiles.push({ type: 'wave', x: p.x + p.dir * 30, y: my - 4, vx: p.dir * 560, vy: 0, g: 0, life: 0.85, age: 0, dmg: a.dmg, pierce: true, dir: p.dir, w: 70, h: 110, hit: new Set() });
+        this.projectiles.push({ type: 'wave', x: p.x + p.dir * 30, y: my - 4, vx: p.dir * 560, vy: 0, g: 0, life: 0.85, age: 0, dmg: a.dmg, pierce: true, dir: p.dir, w: 70, h: 110, hit: new Set(), owner: p });
         break;
       case 'bottle':
         p.atkT = p.atkDur = 0.3; sfx.throw();
-        this.projectiles.push({ type: 'bottle', x: mx, y: my - 10, vx: p.dir * 440 + p.vx * 0.3, vy: -470, g: 1500, life: 2.2, age: 0, dmg: a.dmg, rot: 0, spin: p.dir * 14, w: 20, h: 20, hit: new Set(), splash: true });
+        this.projectiles.push({ type: 'bottle', x: mx, y: my - 10, vx: p.dir * 440 + p.vx * 0.3, vy: -470, g: 1500, life: 2.2, age: 0, dmg: a.dmg, rot: 0, spin: p.dir * 14, w: 20, h: 20, hit: new Set(), splash: true, owner: p });
         break;
       case 'pie':
         p.atkT = p.atkDur = 0.3; sfx.throw();
-        this.projectiles.push({ type: 'pie', x: mx, y: my, vx: p.dir * 430 + p.vx * 0.2, vy: this.aimVy(mx, my, 430, 650, -150), g: 650, life: 0.6, age: 0, dmg: a.dmg, w: 28, h: 18, hit: new Set(), stun: 1.8 });
+        this.projectiles.push({ type: 'pie', x: mx, y: my, vx: p.dir * 430 + p.vx * 0.2, vy: this.aimVy(p, mx, my, 430, 650, -150), g: 650, life: 0.6, age: 0, dmg: a.dmg, w: 28, h: 18, hit: new Set(), stun: 1.8, owner: p });
         break;
       case 'wrench':
         p.atkT = p.atkDur = 0.24; sfx.throw();
-        this.projectiles.push({ type: 'wrench', x: mx, y: my, vx: p.dir * 560, vy: this.aimVy(mx, my, 560, 150, -40), g: 150, life: 0.45, age: 0, dmg: a.dmg, rot: 0, spin: p.dir * 22, w: 22, h: 22, hit: new Set() });
+        this.projectiles.push({ type: 'wrench', x: mx, y: my, vx: p.dir * 560, vy: this.aimVy(p, mx, my, 560, 150, -40), g: 150, life: 0.45, age: 0, dmg: a.dmg, rot: 0, spin: p.dir * 22, w: 22, h: 22, hit: new Set(), owner: p });
         break;
       case 'pancake':
-        if (this.projectiles.filter((q) => q.type === 'pancake').length >= 2) { p.cd = 0.1; return; }
+        if (this.projectiles.filter((q) => q.type === 'pancake' && q.owner === p).length >= 2) { p.cd = 0.1; return; }
         p.atkT = p.atkDur = 0.3; sfx.throw();
-        this.projectiles.push({ type: 'pancake', x: mx, y: my, vx: p.dir * 560, vy: this.aimVy(mx, my, 560, 0, 0) * 0.8, g: 0, life: 1.6, age: 0, dmg: a.dmg, rot: 0, spin: 18, w: 34, h: 18, hit: new Set(), boomerang: true, dir: p.dir, back: false, pierce: true });
+        this.projectiles.push({ type: 'pancake', x: mx, y: my, vx: p.dir * 560, vy: this.aimVy(p, mx, my, 560, 0, 0) * 0.8, g: 0, life: 1.6, age: 0, dmg: a.dmg, rot: 0, spin: 18, w: 34, h: 18, hit: new Set(), boomerang: true, dir: p.dir, back: false, pierce: true, owner: p });
         break;
+      case 'chalk': {
+        // Avalon gooit bordkrijtjes: snel en recht, met een klein boogje
+        p.atkT = p.atkDur = 0.22; sfx.chalk();
+        const color = CHALK_COLORS[Math.floor(Math.random() * CHALK_COLORS.length)];
+        this.projectiles.push({ type: 'chalk', x: mx, y: my - 6, vx: p.dir * 640 + p.vx * 0.3, vy: this.aimVy(p, mx, my - 6, 640, 320, -70), g: 320, life: 0.6, age: 0, dmg: a.dmg, rot: 0, spin: p.dir * 20, w: 22, h: 16, hit: new Set(), color, owner: p });
+        break;
+      }
+      case 'rice': {
+        // Lola gooit een handvol rijst: een waaier van korrels, dichtbij raken ze bijna allemaal
+        p.atkT = p.atkDur = 0.28; sfx.rice();
+        const base = this.aimVy(p, mx, my, 560, 600, -120) / 560;
+        for (let i = 0; i < 7; i++) {
+          const sp = 520 + Math.random() * 140, spread = (i - 3) * 0.09 + (Math.random() - 0.5) * 0.06;
+          const ang = Math.atan(base) + spread;
+          this.projectiles.push({ type: 'rice', x: mx, y: my, vx: p.dir * Math.cos(ang) * sp + p.vx * 0.2, vy: Math.sin(ang) * sp, g: 600, life: 0.42, age: 0, dmg: a.dmg, w: 12, h: 12, hit: new Set(), owner: p });
+        }
+        break;
+      }
+    }
+  }
+
+  special(p) {
+    const s = p.char.special;
+    p.cd2 = s.cd;
+    if (s.type === 'hairball') {
+      // Fu-Chi spuugt een haarbal: boogje, raakt hard en de vijand is even van slag
+      p.spitT = 0.3; sfx.hairball();
+      const mx = p.x + p.dir * 26, my = p.y - p.h * 0.75;
+      this.projectiles.push({ type: 'hairball', x: mx, y: my, vx: p.dir * 520 + p.vx * 0.3, vy: this.aimVy(p, mx, my, 520, 900, -280), g: 900, life: 1.4, age: 0, dmg: s.dmg, rot: 0, spin: p.dir * 10, w: 26, h: 26, hit: new Set(), stun: 0.7, owner: p });
+    } else if (s.type === 'bow') {
+      // Avalon: strikje op het hoofd van de dichtstbijzijnde tegenstander (bij voorkeur eentje zonder strikje)
+      let best = null, bd = Infinity;
+      for (const e of this.targets()) {
+        const d = Math.hypot(e.x - p.x, (e.y - p.y) * 0.8) + (e.bow ? 400 : 0);
+        if (d < bd && Math.abs(e.x - p.x) < this.viewW * 0.75) { bd = d; best = e; }
+      }
+      p.atkT = p.atkDur = 0.25;
+      if (!best) { p.cd2 = 0.3; this.texts.push({ x: p.x, y: p.y - p.h - 20, text: '?', life: 0.8, vy: -40, color: '#ff8ac0' }); return; }
+      sfx.bow();
+      best.bow = true;
+      if (best.isBoss) { best.stun = Math.max(best.stun, 1.0); best.calm = 1.0; }
+      else { best.calm = 4.5; best.vx = 0; best.charging = 0; best.windup = 0; }
+      const b = this.boxOf(best);
+      for (let k = 0; k < 16; k++) this.particles.push({ kind: 'spark', x: (b.l + b.r) / 2, y: b.t, vx: (Math.random() - 0.5) * 260, vy: -Math.random() * 260, life: 0.7, max: 0.7, color: k % 2 ? '#ff5fa2' : '#fff' });
+      this.texts.push({ x: (b.l + b.r) / 2, y: b.t - 24, text: 'Strikje!', life: 1, vy: -50, color: '#ff8ac0' });
     }
   }
 
   // friendly auto-aim: throw a bit higher/lower towards the nearest target in front (handy for flying bosses)
-  aimVy(sx, sy, speed, g, fallback) {
-    const p = this.p;
+  aimVy(p, sx, sy, speed, g, fallback) {
     let best = null, bd = 1e9;
     for (const e of this.targets()) {
       const b = this.boxOf(e); const ex = (b.l + b.r) / 2, ey = (b.t + b.b) / 2;
@@ -348,19 +486,18 @@ export class Game {
   }
 
   targets() {
-    const list = this.enemies.filter((e) => !e.dead);
+    const list = this.enemies.filter((e) => !e.dead && !(e.pop !== undefined && e.pop < 0.4));
     if (this.boss && !this.boss.dead && this.boss.state !== 'intro' && !(this.boss.fade !== undefined && this.boss.fade < 0.5)) list.push(this.boss);
     return list;
   }
   boxOf(e) {
     if (e.isBoss) { const [w, h] = BOSS_SIZE[e.kind]; const s = e.scale; return { l: e.x - w * s * 0.42, r: e.x + w * s * 0.42, t: e.y - h * s * 0.95, b: e.y - h * s * 0.05 }; }
     const big = e.puffed ? 1.4 : 1;
-    return { l: e.x - (e.w / 2) * big, r: e.x + (e.w / 2) * big, t: e.y - e.h * big - (e.type === 'puffer' ? 0 : 0), b: e.y };
+    const hh = e.h * big * (e.pop ?? 1);
+    return { l: e.x - (e.w / 2) * big, r: e.x + (e.w / 2) * big, t: e.y - hh, b: e.y };
   }
-  melee(box, dmg, kind) {
-    for (const e of this.targets()) if (overlap(box, this.boxOf(e))) this.damage(e, dmg, { kind, fromX: this.p.x });
-    // visual
-    const p = this.p;
+  melee(p, box, dmg, kind) {
+    for (const e of this.targets()) if (overlap(box, this.boxOf(e))) this.damage(e, dmg, { kind, fromX: p.x });
     if (kind === 'sword') this.particles.push({ kind: 'slash', x: p.x + p.dir * 30, y: p.y - p.h * 0.55, dir: p.dir, life: 0.2, max: 0.2 });
   }
   damage(e, dmg, opts = {}) {
@@ -369,8 +506,8 @@ export class Game {
     if (opts.stun) e.stun = e.isBoss ? Math.min(0.6, opts.stun) : opts.stun;
     this.particles.push({ kind: 'hit', x: e.x, y: e.y - (e.isBoss ? 80 * e.scale : e.h * 0.6), life: 0.25, max: 0.25 });
     if (e.isBoss) { sfx.bossHit(); this.hooks.onBossBar(e.name, Math.max(0, e.hp / e.maxhp)); this.shake = Math.max(this.shake, 3); }
-    else { sfx.hit(); e.vx = Math.sign(e.x - (opts.fromX ?? this.p.x)) * 120; if (!e.flying) e.vy = -160; }
-    if (e.hp <= 0) e.isBoss ? this.killBoss(e) : this.killEnemy(e);
+    else { sfx.hit(); e.vx = Math.sign(e.x - (opts.fromX ?? e.x - 1)) * 120; if (!e.flying && e.pop === undefined) e.vy = -160; }
+    if (e.hp <= 0.001) e.isBoss ? this.killBoss(e) : this.killEnemy(e);
   }
   killEnemy(e) {
     e.dead = true; sfx.enemyDie();
@@ -378,31 +515,23 @@ export class Game {
     this.addCoins(e.hard ? COIN_HARD : COIN_NORMAL, e.x, e.y - e.h - 10);
   }
 
-  hammerHit() {
-    const p = this.p;
+  hammerHit(p) {
     sfx.thud(); this.shake = 6;
     const box = { l: p.x - 105, r: p.x + 105, t: p.y - p.h - 40, b: p.y + 20 };
-    for (const e of this.targets()) {
-      const b = this.boxOf(e);
-      if (overlap(box, b)) this.damage(e, this.char.attack.dmg, { kind: 'hammer', fromX: p.x });
-    }
+    for (const e of this.targets()) if (overlap(box, this.boxOf(e))) this.damage(e, p.char.attack.dmg, { kind: 'hammer', fromX: p.x });
     this.particles.push({ kind: 'ring', x: p.x, y: p.y, life: 0.35, max: 0.35 });
     this.dust(p.x - 40, p.y, 6); this.dust(p.x + 40, p.y, 6);
   }
 
   // ---------- projectiles ----------
   updateProjectiles(dt) {
-    if (this.pendingHammer !== undefined && this.pendingHammer !== null) {
-      this.pendingHammer -= dt;
-      if (this.pendingHammer <= 0) { this.pendingHammer = null; this.hammerHit(); }
-    }
-    const p = this.p;
     for (const q of this.projectiles) {
       q.age += dt;
       if (q.boomerang) {
+        const o = q.owner || this.players[0];
         if (!q.back && q.age > 0.3) { q.back = true; q.hit = new Set(); }
         if (q.back) {
-          const dx = p.x - q.x, dy = (p.y - p.h * 0.6) - q.y; const dist = Math.hypot(dx, dy) || 1;
+          const dx = o.x - q.x, dy = (o.y - o.h * 0.6) - q.y; const dist = Math.hypot(dx, dy) || 1;
           q.vx += (dx / dist) * 2600 * dt; q.vy += (dy / dist) * 2600 * dt;
           const sp = Math.hypot(q.vx, q.vy); if (sp > 720) { q.vx *= 720 / sp; q.vy *= 720 / sp; }
           if (dist < 30) q.dead = true;
@@ -422,6 +551,9 @@ export class Game {
           this.damage(e, q.dmg, { stun: q.stun, fromX: q.x - q.vx });
           if (q.type === 'pie') { sfx.splat(); this.splat(q.x, q.y, '#f2e2b0'); }
           if (q.type === 'wrench') sfx.clang();
+          if (q.type === 'chalk') { sfx.chalkHit(); this.chalkDust(q.x, q.y, q.color); }
+          if (q.type === 'hairball') { sfx.splat(); this.splat(q.x, q.y, '#b8a080'); }
+          if (q.type === 'rice') this.particles.push({ kind: 'spark', x: q.x, y: q.y, vx: (Math.random() - 0.5) * 120, vy: -Math.random() * 120, life: 0.3, max: 0.3, color: '#fffdf2' });
           if (!q.pierce) { q.dead = true; break; }
         }
       }
@@ -433,6 +565,8 @@ export class Game {
           if (q.splash) this.shatter(q);
           else if (q.type === 'pie') { sfx.splat(); this.splat(q.x, gy, '#f2e2b0'); }
           else if (q.type === 'wrench') { sfx.clang(); this.dust(q.x, gy, 3); }
+          else if (q.type === 'chalk') this.chalkDust(q.x, gy, q.color);
+          else if (q.type === 'hairball') this.splat(q.x, gy, '#b8a080');
         }
       }
     }
@@ -450,10 +584,12 @@ export class Game {
         const gy = this.groundAt(h.x);
         if (gy !== null && h.y > gy && h.vy > 0) { h.dead = true; if (h.type === 'bolt') sfx.zap(); this.dust(h.x, gy, 4); }
       }
-      const pb = { l: p.x - p.w / 2 + 4, r: p.x + p.w / 2 - 4, t: p.y - p.h + 6, b: p.y };
       const hb = { l: h.x - h.w / 2, r: h.x + h.w / 2, t: h.y - h.h / 2, b: h.y + h.h / 2 };
       if (h.type === 'shock') { hb.t = h.y - 26; hb.b = h.y; }
-      if (!h.dead && overlap(pb, hb) && this.phase !== 'dead') { this.hurt(); if (h.type !== 'shock') h.dead = true; }
+      for (const p of this.live()) {
+        const pb = { l: p.x - p.w / 2 + 4, r: p.x + p.w / 2 - 4, t: p.y - p.h + 6, b: p.y };
+        if (!h.dead && overlap(pb, hb) && this.phase !== 'dead') { this.hurt(p); if (h.type !== 'shock') h.dead = true; }
+      }
     }
     this.hostile = this.hostile.filter((h) => !h.dead);
   }
@@ -465,16 +601,25 @@ export class Game {
     for (let i = 0; i < 6; i++) this.particles.push({ kind: 'glass', x: q.x, y: q.y, vx: (Math.random() - 0.5) * 260, vy: -Math.random() * 200, life: 0.5, max: 0.5 });
   }
   splat(x, y, color) { for (let i = 0; i < 10; i++) this.particles.push({ kind: 'blob', x, y, vx: (Math.random() - 0.5) * 240, vy: -Math.random() * 200, life: 0.5, max: 0.5, color }); }
+  chalkDust(x, y, color) { for (let i = 0; i < 9; i++) this.particles.push({ kind: 'blob', x, y, vx: (Math.random() - 0.5) * 200, vy: -Math.random() * 160, life: 0.4, max: 0.4, color }); }
 
   // ---------- enemies ----------
   updateEnemies(dt) {
-    const p = this.p, ph = this.world.physics;
+    const ph = this.world.physics;
     for (const e of this.enemies) {
       if (e.dead) continue;
+      const p = this.nearestPlayer(e.x, e.y);
       if (Math.abs(e.x - p.x) > this.viewW * 1.3 && !e.summoned) continue; // sleep off-screen
       e.t += dt;
       if (e.flash > 0) e.flash -= dt;
-      if (e.stun > 0) { e.stun -= dt; e.vx *= 0.9; this.enemyPhysics(e, dt); continue; }
+      if (e.calm > 0) e.calm -= dt;
+      if (e.stun > 0 || e.calm > 0) {
+        if (e.stun > 0) e.stun -= dt;
+        e.vx *= 0.9; e.aim = 0;
+        if (e.flying) { e.vy *= 0.9; e.y += (e.vy || 0) * dt; } else this.enemyPhysics(e, dt);
+        if (e.calm > 0) { this.enemyContact(e, true); continue; }
+        continue;
+      }
       const d = e.def; const dxp = p.x - e.x;
       switch (d.behavior) {
         case 'walker': {
@@ -509,9 +654,11 @@ export class Game {
           e.dir = Math.sign(dxp) || e.dir; e.vx = 0; e.cool -= dt; e.aim = Math.max(0, e.aim - dt);
           if (e.cool <= 0 && Math.abs(dxp) < 560) {
             e.cool = 2.4 - (this.level - 1) * 0.2; e.aim = 0.4;
-            const tt = 0.9; const vx = dxp / tt; const vy = ((p.y - 40) - (e.y - 50)) / tt - 0.5 * 900 * tt;
-            this.hostile.push({ type: d.proj, x: e.x + e.dir * 14, y: e.y - 50, vx, vy, g: 900, life: 3, age: 0, w: 20, h: 20 });
-            sfx.zap();
+            const flat = d.proj === 'arrow' || d.proj === 'seed';
+            const tt = flat ? 0.7 : 0.9; const g = flat ? 300 : 900;
+            const vx = dxp / tt; const vy = ((p.y - 40) - (e.y - 50)) / tt - 0.5 * g * tt;
+            this.hostile.push({ type: d.proj, x: e.x + e.dir * 14, y: e.y - (d.proj === 'seed' ? 18 : 50), vx, vy, g, life: 3, age: 0, w: 20, h: 20 });
+            if (d.proj === 'bolt') sfx.zap(); else sfx.throw();
           }
           this.enemyPhysics(e, dt);
           break;
@@ -535,17 +682,72 @@ export class Game {
           e.puffed = Math.abs(dxp) < 160 || Math.sin(e.t * 1.3) > 0.6;
           break;
         }
+        case 'diver': {
+          // vliegt heen en weer en duikt op een speler af als die eronder loopt
+          if (e.state === 'dive') {
+            e.x += e.vx * dt; e.y += e.vy * dt; e.vy += 300 * dt;
+            const gy = this.groundAt(e.x);
+            if ((gy !== null && e.y > gy - 8) || e.t > e.until) { e.state = 'up'; e.until = e.t + 1.6; }
+          } else if (e.state === 'up') {
+            e.x += (e.home - e.x) * Math.min(1, dt * 1.2); e.y += (e.homeY - e.y) * Math.min(1, dt * 1.6);
+            e.dir = Math.sign(e.home - e.x) || e.dir;
+            if (e.t > e.until) { e.state = 'idle'; e.t0 = e.t; e.cool = 1.4; }
+          } else {
+            e.cool -= dt;
+            e.x = e.home + Math.sin((e.t - (e.t0 || 0)) * d.speed) * (d.range || 100);
+            e.dir = Math.cos((e.t - (e.t0 || 0)) * d.speed) > 0 ? 1 : -1;
+            e.y = e.homeY + Math.sin(e.t * 2.1) * 12;
+            const below = p.y > e.y + 40;
+            if (e.cool <= 0 && below && Math.abs(dxp) < 300) {
+              e.state = 'dive'; e.until = e.t + 1.4; e.dir = Math.sign(dxp) || 1;
+              const tt = 0.75; e.vx = dxp / tt; e.vy = ((p.y - p.h * 0.5) - e.y) / tt - 0.5 * 300 * tt;
+              sfx.swish();
+            }
+          }
+          e.diving = e.state === 'dive';
+          break;
+        }
+        case 'dropper': {
+          // hangt aan een draadje (spin) of aan een wolk (ijspegel) en valt als je eronder loopt
+          if (e.state === 'drop') {
+            e.vy = Math.min((e.vy || 0) + 1600 * dt, 700); e.y += e.vy * dt;
+            const gy = this.groundBelow(e.x, e.homeY);
+            if (gy !== null && e.y >= gy) { e.y = gy; e.vy = 0; e.state = 'wait'; e.until = e.t + (e.type === 'icicle' ? 0.4 : 1.2); this.dust(e.x, gy, 4); if (e.type === 'icicle') sfx.glass(); }
+            if (e.y > GROUND_Y + 400) e.dead = true;
+          } else if (e.state === 'wait') {
+            if (e.t > e.until) { if (e.type === 'icicle') { e.dead = true; for (let i = 0; i < 8; i++) this.particles.push({ kind: 'glass', x: e.x, y: e.y - 10, vx: (Math.random() - 0.5) * 200, vy: -Math.random() * 200, life: 0.5, max: 0.5 }); } else e.state = 'climb'; }
+          } else if (e.state === 'climb') {
+            e.y -= 110 * dt; if (e.y <= e.homeY) { e.y = e.homeY; e.state = 'idle'; e.cool = 1; }
+          } else {
+            e.cool -= dt;
+            e.y = e.homeY + Math.sin(e.t * 2) * 4;
+            if (e.cool <= 0 && Math.abs(dxp) < 70 && p.y > e.y) { e.state = 'drop'; e.vy = 0; }
+          }
+          e.dir = Math.sign(dxp) || 1;
+          break;
+        }
+        case 'popper': {
+          // verstopt in de grond, komt omhoog als je dichtbij komt
+          if (e.state === 'idle') { e.pop = Math.max(0, e.pop - dt * 3); e.cool -= dt; if (e.cool <= 0 && Math.abs(dxp) < 190) { e.state = 'up'; e.until = e.t + 1.8; sfx.bubble(); } }
+          else { e.pop = Math.min(1, e.pop + dt * 4); if (e.t > e.until) { e.state = 'idle'; e.cool = 1.4; } }
+          e.dir = Math.sign(dxp) || 1;
+          break;
+        }
       }
-      // contact with player
-      const pb = { l: p.x - p.w / 2 + 3, r: p.x + p.w / 2 - 3, t: p.y - p.h + 4, b: p.y };
-      const eb = this.boxOf(e);
-      if (overlap(pb, eb) && this.phase !== 'dead') {
-        const stomp = this.p.vy > 120 && p.y - 14 < eb.t + 12 && e.type !== 'puffer';
-        if (stomp) { this.p.vy = -480; this.p.cut = true; sfx.stomp(); this.damage(e, 1, { fromX: p.x }); }
-        else if (e.stun <= 0) this.hurt();
-      }
+      this.enemyContact(e, false);
     }
-    this.enemies = this.enemies.filter((e) => !e.dead || false);
+    this.enemies = this.enemies.filter((e) => !e.dead);
+  }
+  enemyContact(e, calm) {
+    if (e.pop !== undefined && e.pop < 0.4) return;
+    const eb = this.boxOf(e);
+    for (const p of this.live()) {
+      const pb = { l: p.x - p.w / 2 + 3, r: p.x + p.w / 2 - 3, t: p.y - p.h + 4, b: p.y };
+      if (!overlap(pb, eb) || this.phase === 'dead') continue;
+      const stomp = p.vy > 120 && p.y - 14 < eb.t + 12 && e.type !== 'puffer' && !e.def.nostomp;
+      if (stomp) { p.vy = -480; p.cut = true; sfx.stomp(); this.damage(e, 1, { fromX: p.x }); }
+      else if (e.stun <= 0 && !calm) this.hurt(p);
+    }
   }
   groundAhead(e) {
     const ax = e.x + e.dir * (e.w / 2 + 6);
@@ -563,6 +765,7 @@ export class Game {
     }
   }
   enemyPhysics(e, dt) {
+    if (e.flying || e.pop !== undefined) return;
     const ph = this.world.physics;
     const prev = e.y;
     e.vy = Math.min(e.vy + ph.gravity * dt, ph.maxFall);
@@ -579,12 +782,21 @@ export class Game {
     this.arenaLocked = true; this.phase = 'boss'; this.phaseT = 0;
     const spec = bossSpec(this.worldIdx, this.level);
     const a = this.lv.arena;
-    const [bw, bh] = BOSS_SIZE[spec.kind];
+    // met z'n tweeën is de baas wat sterker
+    const hp = Math.round(spec.hp * (this.multi ? 1.5 : 1));
     this.boss = {
       ...spec, isBoss: true, x: a.x + a.w - 240, y: -200, vx: 0, vy: 0, dir: -1,
-      hp: spec.hp, maxhp: spec.hp, state: 'intro', timer: 1.4, flash: 0, stun: 0, dizzy: 0, attacksDone: 0,
-      groundY: a.y, hoverY: a.y - (spec.flying ? 120 + 50 * spec.scale : 0), last: null, moving: false, breath: 0,
+      hp, maxhp: hp, state: 'intro', timer: 1.4, flash: 0, stun: 0, dizzy: 0, attacksDone: 0,
+      groundY: a.y, hoverY: a.y - (spec.flying ? 120 + 50 * spec.scale : 0), last: null, moving: false, breath: 0, bow: false,
     };
+    // haal een achterblijver de arena in
+    for (const p of this.players) {
+      if (p.down) continue;
+      if (p.x < a.x + 30 || p.x > a.x + a.w - 30) {
+        p.x = a.x + 70; p.y = a.y - 2; p.vx = 0; p.vy = 0;
+        for (let k = 0; k < 10; k++) this.particles.push({ kind: 'spark', x: p.x, y: p.y - 30, vx: (Math.random() - 0.5) * 200, vy: -Math.random() * 200, life: 0.5, max: 0.5, color: '#fff' });
+      }
+    }
     playMusic('boss');
     sfx.bossRoar();
     this.hooks.onBanner(spec.name, spec.mini ? `Mini-baas · Level ${this.level}` : 'EINDBAAS!', 1800);
@@ -594,15 +806,16 @@ export class Game {
 
   updateBoss(dt) {
     const b = this.boss; if (!b || b.dead) return;
-    const p = this.p, a = this.lv.arena;
+    const a = this.lv.arena;
+    const p = this.nearestPlayer(b.x, b.y);
     b.flash = Math.max(0, b.flash - dt);
     b.breath = Math.max(0, b.breath - dt);
+    if (b.calm > 0) b.calm -= dt;
     if (b.dizzy > 0) b.dizzy -= dt;
     b.timer -= dt;
     const sp = b.speed;
     const left = a.x + 80, right = a.x + a.w - 80;
     const faceP = () => { b.dir = p.x > b.x ? 1 : -1; };
-    const onGround = () => b.y >= b.groundY - 0.5;
     const gravity = (k = 1) => { b.vy += 2000 * k * dt; b.y += b.vy * dt; if (b.y >= b.groundY) { const landed = b.vy > 300; b.y = b.groundY; b.vy = 0; return landed; } return false; };
     const hover = () => { b.y += ((b.hoverY + Math.sin(this.t * 2) * 14) - b.y) * Math.min(1, dt * 3); };
     if (b.stun > 0) { b.stun -= dt; return; }
@@ -618,7 +831,7 @@ export class Game {
         b.moving = false;
         if (b.flying) { hover(); b.x += (clamp(p.x + (b.x > p.x ? 220 : -220), left, right) - b.x) * dt * 0.8; b.moving = true; }
         else { gravity(); if (Math.abs(p.x - b.x) > 200) { b.x += b.dir * 70 * sp * dt; b.moving = true; } }
-        if (b.timer <= 0) this.bossChoose(b);
+        if (b.timer <= 0) this.bossChoose(b, p);
         break;
       }
       case 'rest': // flying bosses come down to rest: chance to hit them with melee
@@ -695,12 +908,11 @@ export class Game {
         if (b.flying) hover(); else gravity();
         if (b.timer <= 0) {
           const alive = this.enemies.filter((e) => e.summoned && !e.dead).length;
-          const types = this.world.enemies.normal;
+          const types = this.world.enemies.normal.filter((t) => ['walker', 'hopper', 'flyer', 'floater'].includes(ENEMY_TYPES[t].behavior));
           for (let i = 0; i < Math.min(2, 3 - alive); i++) {
-            const t = types[i % types.length];
+            const t = types[Math.floor(Math.random() * types.length)];
             const ex = i ? left + 20 : right - 20;
-            const def = ENEMY_TYPES[t];
-            const flying = ['flyer', 'floater', 'puffer'].includes(def.behavior);
+            const flying = isFlying(t);
             const e = this.makeEnemy({ id: 9000 + Math.floor(Math.random() * 1e6), type: t, x: ex, y: flying ? GROUND_Y - 140 : GROUND_Y - 200, range: 200, hard: false });
             e.summoned = true; e.home = ex; this.enemies.push(e);
             for (let k = 0; k < 8; k++) this.particles.push({ kind: 'spark', x: ex, y: GROUND_Y - 60, vx: (Math.random() - 0.5) * 200, vy: -Math.random() * 200, life: 0.5, max: 0.5, color: '#fff' });
@@ -734,23 +946,26 @@ export class Game {
     b.x = clamp(b.x, left - 60, right + 60);
 
     // contact damage
-    const pb = { l: p.x - p.w / 2 + 4, r: p.x + p.w / 2 - 4, t: p.y - p.h + 6, b: p.y };
-    if (overlap(pb, this.boxOf(b)) && b.state !== 'intro' && !(b.fade !== undefined && b.fade < 0.5)) {
+    if (b.state !== 'intro' && !(b.fade !== undefined && b.fade < 0.5)) {
       const bb = this.boxOf(b);
-      if (p.vy > 150 && p.y - 20 < bb.t + 20) { p.vy = -560; sfx.stomp(); this.damage(b, 1, {}); }
-      else this.hurt();
+      for (const q of this.live()) {
+        const pb = { l: q.x - q.w / 2 + 4, r: q.x + q.w / 2 - 4, t: q.y - q.h + 6, b: q.y };
+        if (!overlap(pb, bb)) continue;
+        if (q.vy > 150 && q.y - 20 < bb.t + 20) { q.vy = -560; sfx.stomp(); this.damage(b, 1, {}); }
+        else this.hurt(q);
+      }
     }
   }
-  bossChoose(b) {
-    let opts = b.attacks.filter((x) => x !== b.last || b.attacks.length === 1);
+  bossChoose(b, p) {
+    const opts = b.attacks.filter((x) => x !== b.last || b.attacks.length === 1);
     const atk = opts[Math.floor(Math.random() * opts.length)];
     b.last = atk; b.state = atk; b.sub = null; b.attacksDone++;
     const lvl = this.level;
     if (b.flying && b.attacksDone % 3 === 0 && atk !== 'charge') { b.state = 'rest'; b.timer = 1.8; b.vy = 0; return; }
     switch (atk) {
-      case 'charge': b.sub = 'wind'; b.timer = 0.55; b.dir = this.p.x > b.x ? 1 : -1; break;
+      case 'charge': b.sub = 'wind'; b.timer = 0.55; b.dir = p.x > b.x ? 1 : -1; break;
       case 'slam': {
-        b.sub = 'up'; const tt = 0.85; b.vx = clamp((this.p.x - b.x) / tt, -500, 500); b.vy = b.flying ? -300 : -850;
+        b.sub = 'up'; const tt = 0.85; b.vx = clamp((p.x - b.x) / tt, -500, 500); b.vy = b.flying ? -300 : -850;
         if (b.flying) { b.vy = 400; b.y = Math.min(b.y, b.groundY - 1); }
         break;
       }
@@ -810,39 +1025,42 @@ export class Game {
       this.hooks.onBanner('De mensen zijn bevrijd!', `${this.world.name} uitgespeeld`, 3500);
       this.arenaLocked = false;
     }
-    if (this.people) {
-      for (const pp of this.people) {
-        pp.vy += 1600 * dt; pp.x += pp.vx * dt; pp.y += pp.vy * dt;
-        if (pp.y >= pp.groundY) { pp.y = pp.groundY; pp.vy = 0; pp.cheer += dt; if (Math.random() < dt * 1.6) pp.vy = -380; }
-        const targetX = this.p.x + 60 + pp.i * 40;
-        pp.vx += ((targetX - pp.x) * 2 - pp.vx) * dt * 2;
-        pp.dir = pp.vx >= 0 ? 1 : -1;
-        if (Math.abs(targetX - pp.x) < 30) pp.dir = this.p.x > pp.x ? 1 : -1;
-      }
-    }
+    if (this.people) this.updatePeople(dt);
     if (this.phase === 'freed' && this.phaseT > 5.5) {
       this.phase = 'done'; this.running = false;
       this.hooks.onWorldComplete({ coins: this.coins, lives: this.lives });
     }
   }
+  updatePeople(dt) {
+    const lead = this.rear();
+    for (const pp of this.people) {
+      pp.vy += 1600 * dt; pp.x += pp.vx * dt; pp.y += pp.vy * dt;
+      if (pp.y >= pp.groundY) { pp.y = pp.groundY; pp.vy = 0; pp.cheer += dt; if (Math.random() < dt * 1.6) pp.vy = -380; }
+      const targetX = lead.x + 60 + pp.i * 40;
+      pp.vx += ((targetX - pp.x) * 2 - pp.vx) * dt * 2;
+      pp.dir = pp.vx >= 0 ? 1 : -1;
+      if (Math.abs(targetX - pp.x) < 30) pp.dir = lead.x > pp.x ? 1 : -1;
+    }
+  }
 
   // ---------- pickups ----------
   updatePickups() {
-    const p = this.p;
-    const pb = { l: p.x - p.w / 2 - 6, r: p.x + p.w / 2 + 6, t: p.y - p.h - 6, b: p.y + 4 };
-    for (const tk of this.tokens) {
-      if (tk.got) continue;
-      if (overlap(pb, { l: tk.x - 20, r: tk.x + 20, t: tk.y - 20, b: tk.y + 20 })) {
-        tk.got = true; sfx.token(); this.addCoins(COIN_TOKEN, tk.x, tk.y - 20);
-        for (let i = 0; i < 18; i++) this.particles.push({ kind: 'spark', x: tk.x, y: tk.y, vx: (Math.random() - 0.5) * 400, vy: (Math.random() - 0.5) * 400, life: 0.6, max: 0.6, color: i % 2 ? '#7aff6a' : '#fff' });
+    for (const p of this.live()) {
+      const pb = { l: p.x - p.w / 2 - 6, r: p.x + p.w / 2 + 6, t: p.y - p.h - 6, b: p.y + 4 };
+      for (const tk of this.tokens) {
+        if (tk.got) continue;
+        if (overlap(pb, { l: tk.x - 20, r: tk.x + 20, t: tk.y - 20, b: tk.y + 20 })) {
+          tk.got = true; sfx.token(); this.addCoins(COIN_TOKEN, tk.x, tk.y - 20);
+          for (let i = 0; i < 18; i++) this.particles.push({ kind: 'spark', x: tk.x, y: tk.y, vx: (Math.random() - 0.5) * 400, vy: (Math.random() - 0.5) * 400, life: 0.6, max: 0.6, color: i % 2 ? '#7aff6a' : '#fff' });
+        }
       }
-    }
-    for (const h of this.hearts) {
-      if (h.got) continue;
-      if (overlap(pb, { l: h.x - 16, r: h.x + 16, t: h.y - 16, b: h.y + 16 })) {
-        if (p.hearts >= MAX_HEARTS) continue;
-        h.got = true; p.hearts = Math.min(MAX_HEARTS, p.hearts + 1); sfx.heart(); this.hud();
-        this.texts.push({ x: h.x, y: h.y - 20, text: '+♥', life: 1, vy: -60, color: '#ff5a7a' });
+      for (const h of this.hearts) {
+        if (h.got) continue;
+        if (overlap(pb, { l: h.x - 16, r: h.x + 16, t: h.y - 16, b: h.y + 16 })) {
+          if (p.hearts >= MAX_HEARTS) continue;
+          h.got = true; p.hearts = Math.min(MAX_HEARTS, p.hearts + 1); sfx.heart(); this.hud();
+          this.texts.push({ x: h.x, y: h.y - 20, text: '+♥', life: 1, vy: -60, color: '#ff5a7a' });
+        }
       }
     }
   }
@@ -860,19 +1078,104 @@ export class Game {
   }
 
   updateCamera(dt) {
-    const p = this.p, c = this.cam;
-    let tx = p.x - this.viewW * 0.38 + p.dir * 40;
-    const a = this.lv.arena;
+    const c = this.cam, a = this.lv.arena;
+    const l = this.live().length ? this.live() : this.players;
+    if (!this.multi) {
+      const p = this.players[0];
+      let tx = p.x - this.viewW * 0.38 + p.dir * 40;
+      if (this.arenaLocked && !this.bossDone) {
+        tx = a.x + a.w / 2 - this.viewW / 2;
+        if (this.viewW < a.w) tx = clamp(p.x - this.viewW / 2, a.x - 20, a.x + a.w - this.viewW + 20);
+      }
+      tx = clamp(tx, 0, this.lv.length - this.viewW);
+      c.x += (tx - c.x) * Math.min(1, dt * 6);
+      const base = GROUND_Y - (this.viewH - 100);
+      const ty = Math.min(base, p.y - p.h - this.viewH * 0.3);
+      c.y += (clamp(ty, base - 380, base + 40) - c.y) * Math.min(1, dt * 4);
+      return;
+    }
+    // twee spelers: zoom uit als ze uit elkaar lopen; de achterste bepaalt waar het beeld is
+    const xs = l.map((p) => p.x), minX = Math.min(...xs), maxX = Math.max(...xs);
+    const top = Math.min(...l.map((p) => p.y - p.h)), bot = Math.max(...l.map((p) => p.y));
+    const zx = (maxX - minX + 70) / ((1 - LEAD) * this.baseViewW);
+    const zy = (Math.max(bot, GROUND_Y) - top + 170) / this.baseViewH;
+    const arenaZ = this.arenaLocked && !this.bossDone ? Math.min(MAX_ZOOM, (a.w + 40) / this.baseViewW) : 1;
+    const zt = clamp(Math.max(1, zx, zy, arenaZ), 1, MAX_ZOOM);
+    this.zoom += (zt - this.zoom) * Math.min(1, dt * 3);
+    this.applyZoom();
+    let tx = minX - this.viewW * LEAD;
     if (this.arenaLocked && !this.bossDone) {
       tx = a.x + a.w / 2 - this.viewW / 2;
-      if (this.viewW < a.w) tx = clamp(p.x - this.viewW / 2, a.x - 20, a.x + a.w - this.viewW + 20);
+      if (this.viewW < a.w) tx = clamp((minX + maxX) / 2 - this.viewW / 2, a.x - 20, a.x + a.w - this.viewW + 20);
     }
-    tx = clamp(tx, 0, this.lv.length - this.viewW);
+    tx = clamp(tx, 0, Math.max(0, this.lv.length - this.viewW));
     c.x += (tx - c.x) * Math.min(1, dt * 6);
-    // vertical: ground sits near the bottom of the screen; follow the player up on high jumps
     const base = GROUND_Y - (this.viewH - 100);
-    const ty = Math.min(base, p.y - p.h - this.viewH * 0.3);
+    const ty = Math.min(base, top - this.viewH * 0.25);
     c.y += (clamp(ty, base - 380, base + 40) - c.y) * Math.min(1, dt * 4);
+  }
+
+  // ---------- online: tweede apparaat ----------
+  // De host rekent alles uit en stuurt ~30 keer per seconde een momentopname; het andere apparaat tekent die.
+  snapshot() {
+    const pr = (q) => [q.type, R(q.x), R(q.y), R(q.vx), R(q.vy), R1(q.rot || 0), q.dir || 0, R1(q.age), R1(q.life || 0), q.color || 0];
+    let parts = this.particles;
+    if (parts.length > 110) parts = parts.slice(-110);
+    const b = this.boss;
+    return {
+      t: R1(this.t * 10) / 10, ph: this.phase, pt: R1(this.phaseT), cp: this.checkpoint, co: this.coins, li: this.lives,
+      sh: R1(this.shake), al: this.arenaLocked ? 1 : 0, bd: this.bossDone ? 1 : 0, cg: this.cageOpen ? 1 : 0,
+      cage: this.cage, po: this.portal,
+      pl: this.players.map((p) => [R(p.x), R(p.y), R(p.vx), R(p.vy), p.dir, R1(p.walk), p.onGround ? 1 : 0, Math.round(p.atkT * 100) / 100, p.atkDur, R1(p.inv), p.hearts, p.down > 0 ? 1 : 0, Math.round(p.spitT * 100) / 100]),
+      en: this.enemies.filter((e) => !e.dead).map((e) => [e.id, e.type, R(e.x), R(e.y), e.dir, R1(e.hp), e.maxhp, R1(e.stun), R1(e.flash),
+        (e.puffed ? 1 : 0) | (e.onGround ? 2 : 0) | (e.hard ? 4 : 0) | (e.bow ? 8 : 0) | (e.charging > 0 ? 16 : 0) | (e.windup > 0 ? 32 : 0) | (e.diving ? 64 : 0),
+        R1(e.calm), R1(e.aim), e.pop === undefined ? -1 : Math.round(e.pop * 100) / 100, R(e.homeY)]),
+      bo: b && !b.dead ? { ...b, x: R(b.x), y: R(b.y) } : null,
+      pr: this.projectiles.map(pr),
+      ho: this.hostile.filter((h) => h.type !== 'warn' || true).map(pr),
+      pa: parts.map((q) => [q.kind, R(q.x), R(q.y), R(q.vx || 0), R(q.vy || 0), R1(q.life), R1(q.max), q.color || 0, q.dir || 0]),
+      tx: this.texts.map((x) => [x.text, R(x.x), R(x.y), R1(x.life), x.vy, x.color]),
+      tk: this.tokens.filter((x) => x.got).map((x) => x.id), hr: this.hearts.filter((x) => x.got).map((x) => x.id),
+      pe: this.people ? this.people.map((pp) => [R(pp.x), R(pp.y), R(pp.vx), pp.dir, R1(pp.cheer)]) : null,
+      lv: [this.worldIdx, this.level],
+    };
+  }
+  applySnapshot(s) {
+    if (s.lv[0] !== this.worldIdx || s.lv[1] !== this.level) return false;
+    this.t = s.t; this.phase = s.ph; this.phaseT = s.pt; this.checkpoint = s.cp; this.coins = s.co; this.lives = s.li;
+    this.shake = s.sh; this.arenaLocked = !!s.al; this.bossDone = !!s.bd; this.cageOpen = !!s.cg; this.cage = s.cage; this.portal = s.po;
+    s.pl.forEach((a, i) => {
+      const p = this.players[i]; if (!p) return;
+      [p.x, p.y, p.vx, p.vy, p.dir, p.walk] = a; p.onGround = !!a[6]; p.atkT = a[7]; p.atkDur = a[8]; p.inv = a[9]; p.hearts = a[10]; p.down = a[11]; p.spitT = a[12];
+    });
+    this.enemies = s.en.map((a) => {
+      const def = ENEMY_TYPES[a[1]];
+      return { id: a[0], type: a[1], def, x: a[2], y: a[3], dir: a[4], hp: a[5], maxhp: a[6], stun: a[7], flash: a[8], w: def.w, h: def.h,
+        puffed: !!(a[9] & 1), onGround: !!(a[9] & 2), hard: !!(a[9] & 4), bow: !!(a[9] & 8), charging: a[9] & 16 ? 1 : 0, windup: a[9] & 32 ? 1 : 0, diving: !!(a[9] & 64),
+        calm: a[10], aim: a[11], pop: a[12] < 0 ? undefined : a[12], homeY: a[13], flying: isFlying(a[1]) };
+    });
+    this.boss = s.bo;
+    const pr = (a) => ({ type: a[0], x: a[1], y: a[2], vx: a[3], vy: a[4], rot: a[5], dir: a[6], age: a[7], life: a[8], color: a[9] || undefined, spin: 0 });
+    this.projectiles = s.pr.map(pr); this.hostile = s.ho.map(pr);
+    this.particles = s.pa.map((a) => ({ kind: a[0], x: a[1], y: a[2], vx: a[3], vy: a[4], life: a[5], max: a[6], color: a[7] || undefined, dir: a[8] }));
+    this.texts = s.tx.map((a) => ({ text: a[0], x: a[1], y: a[2], life: a[3], vy: a[4], color: a[5] }));
+    const tk = new Set(s.tk), hr = new Set(s.hr);
+    this.tokens.forEach((x) => { x.got = tk.has(x.id); }); this.hearts.forEach((x) => { x.got = hr.has(x.id); });
+    if (s.pe) {
+      if (!this.people) this.people = PEOPLE.map((look, i) => ({ look, i, x: 0, y: 0, groundY: this.cage?.y ?? GROUND_Y, vx: 0, vy: 0, dir: -1, cheer: 0, text: ['Dank je!', 'Hoera!', 'Vrij!', 'Held!', 'Joepie!'][i] }));
+      s.pe.forEach((a, i) => { const pp = this.people[i]; [pp.x, pp.y, pp.vx, pp.dir, pp.cheer] = a; });
+    } else this.people = null;
+    return true;
+  }
+  updateMirror(dt) {
+    // tussen twee momentopnames: laat alles een beetje doorbewegen, zodat het vloeiend blijft
+    this.t += dt; this.phaseT += dt;
+    this.updatePlats(dt);
+    for (const p of this.players) { if (p.down) continue; p.x += p.vx * dt; if (!p.onGround) { p.y += p.vy * dt; } if (p.atkT > 0) p.atkT -= dt; if (p.inv > 0) p.inv -= dt; if (p.spitT > 0) p.spitT -= dt; }
+    for (const q of [...this.projectiles, ...this.hostile]) { if (q.type === 'warn') continue; q.x += q.vx * dt; q.y += q.vy * dt; q.age += dt; }
+    this.updateParticles(dt);
+    this.updateCamera(dt);
+    if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 30);
   }
 
   // ---------- render ----------
@@ -909,15 +1212,18 @@ export class Game {
 
     // shadows
     const shadow = (x, y, r) => { const gy = this.groundBelow(x, y); if (gy === null) return; const k = clamp(1 - (gy - y) / 260, 0.2, 1); ctx.fillStyle = `rgba(0,0,0,${0.18 * k})`; ctx.beginPath(); ctx.ellipse(x, gy, r * k, 5 * k, 0, 0, Math.PI * 2); ctx.fill(); };
-    for (const e of this.enemies) if (!e.dead && e.x > x0 && e.x < x1) shadow(e.x, e.y, e.w * 0.5);
+    for (const e of this.enemies) if (!e.dead && e.x > x0 && e.x < x1 && e.pop === undefined) shadow(e.x, e.y, e.w * 0.5);
     if (this.boss && !this.boss.dead) shadow(this.boss.x, this.boss.y, BOSS_SIZE[this.boss.kind][0] * 0.4 * this.boss.scale);
-    shadow(this.p.x, this.p.y, this.p.w * 0.7);
+    for (const p of this.players) if (!p.down) shadow(p.x, p.y, p.w * 0.7);
 
     for (const e of this.enemies) if (!e.dead && e.x > x0 && e.x < x1) drawEnemy(ctx, e, this.t);
-    if (this.boss && !this.boss.dead) drawBoss(ctx, this.boss, this.t);
+    if (this.boss && !this.boss.dead) {
+      drawBoss(ctx, this.boss, this.t);
+      if (this.boss.bow) { const bb = this.boxOf(this.boss); drawBow(ctx, this.boss.x, bb.t + 6, 1.6 * this.boss.scale + 0.4, this.t); }
+    }
     if (this.people) drawFreedPeople(ctx, this.people, this.t);
 
-    this.drawPlayer(ctx);
+    for (const p of this.players) this.drawPlayer(ctx, p);
 
     for (const q of this.projectiles) drawProjectile(ctx, q, this.t);
     for (const h of this.hostile) drawProjectile(ctx, h, this.t);
@@ -947,18 +1253,28 @@ export class Game {
     }
   }
 
-  drawPlayer(ctx) {
-    const p = this.p;
-    if (p.inv > 0 && Math.floor(p.inv * 14) % 2 === 0 && this.phase !== 'dead' && this.phase !== 'gameover') return;
+  drawPlayer(ctx, p) {
+    if (p.down) return;
+    const ended = this.phase === 'dead' || this.phase === 'gameover';
+    if (p.inv > 0 && Math.floor(p.inv * 14) % 2 === 0 && !ended) return;
     ctx.save();
     ctx.translate(p.x, p.y);
     ctx.scale(p.dir, 1);
-    const atk = p.atkT > 0 ? 1 - p.atkT / p.atkDur : -1;
-    drawCharacter(ctx, this.char, {
+    const spitting = p.spitT > 0;
+    const atk = p.atkT > 0 && !spitting ? 1 - p.atkT / p.atkDur : -1;
+    drawCharacter(ctx, p.char, {
       t: this.t, walk: p.walk, moving: Math.abs(p.vx) > 20, air: !p.onGround, vy: p.vy, atk,
-      hurt: p.inv > 1.1 || this.phase === 'dead' || this.phase === 'gameover', mic: this.char.attack.type === 'mic' && atk >= 0,
+      spit: spitting ? 1 - p.spitT / 0.3 : -1,
+      hurt: p.inv > 1.1 || ended, mic: p.char.attack.type === 'mic' && atk >= 0,
     });
     ctx.restore();
+    // met z'n tweeën: een gekleurd pijltje met 1 of 2 boven je hoofd
+    if (this.multi) {
+      const y = p.y - p.h - 18 + Math.sin(this.t * 4 + p.idx) * 2;
+      ctx.fillStyle = PLAYER_COLORS[p.idx];
+      ctx.beginPath(); ctx.moveTo(p.x - 9, y - 12); ctx.lineTo(p.x + 9, y - 12); ctx.lineTo(p.x, y); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = '800 13px "Baloo 2", sans-serif'; ctx.textAlign = 'center'; ctx.fillText(String(p.idx + 1), p.x, y - 14);
+    }
   }
 
   drawParticles(ctx) {
@@ -990,3 +1306,5 @@ export class Game {
     ctx.globalAlpha = 1;
   }
 }
+
+export { charById };

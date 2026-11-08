@@ -9,19 +9,24 @@ const ENEMY_NAMES = {
   cloudling: 'Wolkje', bat: 'Vleermuis', stormtroll: 'Stormtrol',
   crab: 'Krab', jelly: 'Kwal', fish: 'Vis', puffer: 'Kogelvis',
   wasp: 'Wesp', crow: 'Kraai', knight: 'Wolkenridder',
+  monkey: 'Aap', spider: 'Spin', beetle: 'Kever', chameleon: 'Kameleon', toucan: 'Toekan', mosquito: 'Mug', tiger: 'Tijger',
+  raindrop: 'Regendruppel', ghost: 'Spookje', owl: 'Uil', snowman: 'Sneeuwpop', icicle: 'IJspegel', sheep: 'Wolkenschaap', moth: 'Mot', yeti: 'Yeti',
+  shrimp: 'Garnaal', seahorse: 'Zeepaardje', eel: 'Paling', angler: 'Lantaarnvis', starfish: 'Zeester', urchin: 'Zee-egel', shark: 'Haai',
+  seagull: 'Meeuw', dragonling: 'Draakje', squirrel: 'Vliegende eekhoorn', gargoyle: 'Waterspuwer', balloon: 'Ballonmonster', goat: 'Berggeit', archer: 'Boogschutter', eagle: 'Adelaar',
 };
-const FLYING = ['flyer', 'floater', 'puffer'];
+const FLYING = ['flyer', 'floater', 'puffer', 'diver', 'dropper'];
 const GROUND = 440;
 const SPEED = 120;
 
-export function createFinale(hero) {
+export function createFinale(heroes) {
+  heroes = Array.isArray(heroes) ? heroes : [heroes];
   // volgorde: de held voorop, dan de rest van de familie, de bevrijde mensen, per wereld de vijanden en de baas
   const items = [];
   let x = 0;
   const add = (it, gap) => { it.x = x; items.push(it); x += gap; };
   add({ kind: 'title', text: 'Gefeliciteerd!', sub: 'Alle vier de werelden zijn gered' }, 520);
-  add({ kind: 'char', def: hero, label: `${hero.name} · de held!`, big: true }, 230);
-  CHARACTERS.filter((c) => c.id !== hero.id).forEach((c) => add({ kind: 'char', def: c, label: c.name }, 170));
+  heroes.forEach((hero) => add({ kind: 'char', def: hero, label: `${hero.name} · ${heroes.length > 1 ? 'held' : 'de held!'}`, big: true }, 230));
+  CHARACTERS.filter((c) => !heroes.some((h) => h.id === c.id)).forEach((c) => add({ kind: 'char', def: c, label: c.name }, 170));
   x += 120;
   add({ kind: 'title', text: 'De bevrijde mensen', sub: 'Dank je wel!' }, 380);
   PEOPLE.forEach((p, i) => add({ kind: 'person', look: p, label: '' }, 90 + (i === PEOPLE.length - 1 ? 200 : 0)));

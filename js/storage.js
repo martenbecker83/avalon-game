@@ -1,10 +1,11 @@
 // Voortgang, eigen scores (op dit apparaat) en het gedeelde scorebord
 const KEY_PROGRESS = 'avalon.progress.v1';
 const KEY_SCORES = 'avalon.scores.v1';
+const KEY_SCORES2 = 'avalon.scores2.v1'; // 2 spelers samen
 const KEY_SETTINGS = 'avalon.settings.v1';
 const KEY_RUN = 'avalon.run.v1';
 
-// het lopende spel: { char, lives, coins, completed: [worldIds], current: { world, level, checkpoint } | null }
+// het lopende spel: { mode: 'single'|'local2', chars: [ids], lives, coins, completed: [worldIds], current: { world, level, checkpoint } | null }
 export function getRun() { return read(KEY_RUN, null); }
 export function setRun(r) { write(KEY_RUN, r); }
 export function clearRun() { try { localStorage.removeItem(KEY_RUN); } catch { /* */ } }
@@ -26,22 +27,22 @@ export function clearProgress(worldId) {
 export function getSettings() { return { music: true, sfx: true, character: 'avalon', initials: '', ...read(KEY_SETTINGS, {}) }; }
 export function setSettings(s) { write(KEY_SETTINGS, { ...getSettings(), ...s }); }
 
-export function getLocalScores() { return read(KEY_SCORES, []); }
-export function addLocalScore(entry) {
-  const list = getLocalScores(); list.push(entry);
+export function getLocalScores(duo = false) { return read(duo ? KEY_SCORES2 : KEY_SCORES, []); }
+export function addLocalScore(entry, duo = false) {
+  const list = getLocalScores(duo); list.push(entry);
   list.sort((a, b) => b.score - a.score);
-  write(KEY_SCORES, list.slice(0, 50));
+  write(duo ? KEY_SCORES2 : KEY_SCORES, list.slice(0, 50));
 }
 
 const API = '/api/scores';
-export async function fetchGlobalScores() {
-  const r = await fetch(API, { headers: { accept: 'application/json' } });
+export async function fetchGlobalScores(duo = false) {
+  const r = await fetch(duo ? `${API}?mode=duo` : API, { headers: { accept: 'application/json' } });
   if (!r.ok) throw new Error('scorebord niet bereikbaar');
   const data = await r.json();
   return Array.isArray(data.scores) ? data.scores : [];
 }
-export async function postGlobalScore(entry) {
-  const r = await fetch(API, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(entry) });
+export async function postGlobalScore(entry, duo = false) {
+  const r = await fetch(duo ? `${API}?mode=duo` : API, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(entry) });
   if (!r.ok) throw new Error('opslaan mislukt');
   return r.json();
 }

@@ -2,11 +2,12 @@
 
 export const CHARACTERS = [
   {
-    id: 'avalon', name: 'Avalon', weapon: 'Zwaard', kind: 'human', height: 72,
-    power: 'Zwaardslag',
-    desc: 'Supersnel, met snelle zwaardslagen dichtbij.',
-    stats: { kracht: 3, bereik: 2, snelheid: 5 },
-    attack: { type: 'sword', cd: 0.30, dmg: 2 },
+    id: 'avalon', name: 'Avalon', weapon: 'Bordkrijtjes', kind: 'human', height: 72,
+    power: 'Krijtjesworp',
+    desc: 'Supersnel en gooit bordkrijtjes. Met de speciale knop krijgt de dichtstbijzijnde vijand een strikje op: die wordt even poeslief!',
+    stats: { kracht: 3, bereik: 4, snelheid: 5 },
+    attack: { type: 'chalk', cd: 0.30, dmg: 2 },
+    special: { type: 'bow', cd: 2.5, name: 'Strikje' },
     speed: 355, jump: 790,
     look: {
       skin: '#f1c7a6', skinShade: '#d9a383', cheek: '#f39a8f',
@@ -49,9 +50,10 @@ export const CHARACTERS = [
   {
     id: 'fuchi', name: 'Fu-Chi', weapon: 'Klauwen', kind: 'cat', height: 48,
     power: 'Klauwenstorm',
-    desc: 'Supersnel krabben en springt het hoogst van iedereen.',
-    stats: { kracht: 2, bereik: 1, snelheid: 5 },
+    desc: 'Supersnel krabben en springt het hoogst van iedereen. Met de speciale knop spuugt Fu-Chi een haarbal!',
+    stats: { kracht: 2, bereik: 2, snelheid: 5 },
     attack: { type: 'claws', cd: 0.15, dmg: 1 },
+    special: { type: 'hairball', cd: 0.9, dmg: 2, name: 'Haarbal' },
     speed: 360, jump: 880,
     look: { fur: '#efe3d2', furShade: '#cdbba4', point: '#4a2f22', pointHi: '#6e4a36', eye: '#6fb8d8', white: '#ffffff' },
   },
@@ -101,11 +103,11 @@ export const CHARACTERS = [
     },
   },
   {
-    id: 'lola', name: 'Lola', weapon: 'Pannenkoeken', kind: 'human', height: 78,
-    power: 'Pannenkoek-boemerang',
-    desc: 'Pannenkoek-boemerang die heen én terug raakt.',
+    id: 'lola', name: 'Lola', weapon: 'Rijst', kind: 'human', height: 78,
+    power: 'Rijstregen',
+    desc: 'Gooit een handvol rijst. Dichtbij raakt bijna elke korrel!',
     stats: { kracht: 4, bereik: 2, snelheid: 2 },
-    attack: { type: 'pancake', cd: 0.5, dmg: 2 },
+    attack: { type: 'rice', cd: 0.5, dmg: 0.6 },
     speed: 255, jump: 745,
     look: {
       skin: '#dfb08c', skinShade: '#c0906b', cheek: '#e8957f',
@@ -577,7 +579,26 @@ export function drawHeldWeapon(ctx, def, hx, hy, ang, atk, t) {
     ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.fillRect(-3, -29.4, 9, 1);
   } else if (type === 'pancake') {
     if (atk < 0 || atk < 0.5) { ctx.rotate(-ang + Math.PI); drawPancake(ctx, 0, -5, 0.8, t); }
+  } else if (type === 'chalk') {
+    if (atk < 0 || atk < 0.5) { ctx.rotate(-ang + Math.PI); drawChalk(ctx, 0, -5, 0.8, Math.PI / 2, CHALK_COLORS[Math.floor(t * 0.5) % CHALK_COLORS.length]); }
+  } else if (type === 'rice') {
+    ctx.rotate(-ang + Math.PI);
+    // kommetje rijst; bij het gooien vliegt de rijst eruit
+    ell(ctx, 0, -3, 6.5, 3.2, '#3a6ac8');
+    ctx.fillStyle = '#3a6ac8'; ctx.beginPath(); ctx.arc(0, -3, 6.5, 0, Math.PI); ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(-5, -2.4, 10, 1); ctx.fillStyle = '#e8413a'; ctx.fillRect(-4.6, -0.6, 9.2, 0.9);
+    if (atk < 0 || atk > 0.6) { ell(ctx, 0, -4.4, 5.6, 2.6, '#fffdf2'); ell(ctx, -1.5, -5, 2, 1, '#ffffff'); }
   }
+  ctx.restore();
+}
+
+// Bordkrijtje in de hand of als projectiel
+export const CHALK_COLORS = ['#ffffff', '#ffe36b', '#7fd0ff', '#ff9fc8', '#9df07a'];
+export function drawChalk(ctx, x, y, s, rot, color) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.scale(s, s);
+  ctx.fillStyle = color; roundRect(ctx, -7, -2, 14, 4, 1.6); ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.fillRect(-7, 0.6, 14, 1.4);
+  ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.fillRect(-5, -1.6, 9, 0.8);
   ctx.restore();
 }
 
@@ -762,6 +783,8 @@ function drawCat(ctx, def, st) {
     ctx.beginPath(); ctx.moveTo(6, 5 + i); ctx.quadraticCurveTo(12, 3 + i * 2.5, 17, 2 + i * 3.4); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(0, 5 + i); ctx.quadraticCurveTo(-6, 3 + i * 2.5, -11, 3 + i * 3); ctx.stroke();
   }
+  // haarbal spugen: bek open
+  if (st.spit >= 0) { ell(ctx, 3.6, 6.8, 3.4, 2.6 + Math.sin(st.spit * Math.PI) * 1.6, '#5a2a2a'); ell(ctx, 3.6, 7.8, 2, 1.2, '#e87a8a'); }
   ctx.restore();
 
   // claw slash effect

@@ -103,7 +103,21 @@ export const sfx = {
   gameOver() { [392, 330, 262, 196].forEach((f, i) => tone({ f, type: 'triangle', dur: 0.3, vol: 0.2, at: i * 0.22 })); },
   click() { tone({ f: 660, type: 'triangle', dur: 0.06, vol: 0.12 }); },
   portal() { tone({ f: 300, f2: 1200, type: 'sine', dur: 0.6, vol: 0.2 }); },
+  chalk() { noise({ dur: 0.08, vol: 0.2, freq: 3200, q: 2 }); tone({ f: 1400, f2: 900, type: 'triangle', dur: 0.05, vol: 0.06 }); },
+  chalkHit() { noise({ dur: 0.12, vol: 0.25, freq: 2000, q: 0.8 }); tone({ f: 2400, type: 'triangle', dur: 0.04, vol: 0.06 }); },
+  hairball() {
+    // kat die een haarbal ophoest: twee keer 'hek' en dan 'ptoe'
+    noise({ dur: 0.09, vol: 0.3, freq: 500, q: 1.5 }); noise({ dur: 0.09, vol: 0.3, freq: 550, q: 1.5, at: 0.12 });
+    tone({ f: 260, f2: 520, type: 'sawtooth', dur: 0.12, vol: 0.08, at: 0.22 }); noise({ dur: 0.1, vol: 0.25, freq: 1400, q: 1, at: 0.22 });
+  },
+  rice() { noise({ dur: 0.22, vol: 0.22, freq: 5000, q: 0.6, type: 'highpass' }); },
+  bow() { [1319, 1568, 2093].forEach((f, i) => tone({ f, type: 'sine', dur: 0.2, vol: 0.12, at: i * 0.06 })); },
 };
+
+// Met een 'tap' kan het spel geluiden doorsturen naar de tweede speler (online samen spelen)
+let tap = null;
+export function setSfxTap(fn) { tap = fn; }
+for (const k of Object.keys(sfx)) { const f = sfx[k]; sfx[k] = (...a) => { if (tap) tap(k); f(...a); }; }
 
 // ---------- Muziek ----------
 const N = (n) => 440 * Math.pow(2, (n - 69) / 12);
@@ -139,6 +153,7 @@ function buildSong(def) {
 }
 
 export function playMusic(name) {
+  if (tap) tap('music:' + name);
   if (!ac) return;
   if (music && music.name === name) return;
   stopMusic();

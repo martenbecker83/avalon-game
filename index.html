@@ -25,6 +25,7 @@
 <div id="hud" class="hidden">
   <div class="hud-left">
     <div id="hud-hearts"></div>
+    <div id="hud-hearts2" class="hidden"></div>
     <div class="hud-row"><div id="hud-lives"><canvas id="hud-life-ico"></canvas><span id="hud-life-count">×3</span></div>
     <div id="hud-coins"><span class="coin-ico">A</span><span id="hud-coin-count">0</span></div></div>
   </div>
@@ -40,6 +41,7 @@
     <div id="stick" aria-label="Lopen"><div id="stick-knob"></div></div>
   </div>
   <div class="pad-right">
+    <button class="tbtn tbtn-special hidden" data-k="special" aria-label="Speciale aanval">★</button>
     <button class="tbtn tbtn-atk" data-k="attack" aria-label="Aanvallen">⚔</button>
     <button class="tbtn tbtn-jump" data-k="jump" aria-label="Springen">⤒</button>
   </div>
@@ -60,14 +62,15 @@
           <button class="big-btn alt small" id="btn-sfx">🔊 Effecten aan</button>
         </div>
       </div>
-      <p class="help desktop-only">Laptop: ← → lopen · spatie springen · X of J aanvallen · Esc pauze</p>
+      <p class="help desktop-only">Laptop: ← → lopen · spatie springen · X of J aanvallen · C of L speciaal · Esc pauze</p>
+      <p class="help pad-only hidden" id="pad-help">🎮 Controller: A springen · B aanvallen · Y speciaal · Menu pauze</p>
     </div>
   </section>
 
   <section id="scr-chars" class="screen hidden">
     <header class="scr-head">
       <button class="round-btn back" data-back="title" aria-label="Terug">←</button>
-      <h2>Kies je personage</h2>
+      <h2 id="chars-title">Kies je personage</h2>
     </header>
     <div id="char-grid" class="char-grid"></div>
     <div class="char-detail" id="char-detail"></div>
@@ -89,6 +92,10 @@
     <div class="tabs">
       <button class="tab active" data-tab="global">Iedereen</button>
       <button class="tab" data-tab="local">Op dit apparaat</button>
+    </div>
+    <div class="tabs small">
+      <button class="tab ptab active" data-players="1">1 speler</button>
+      <button class="tab ptab" data-players="2">2 spelers</button>
     </div>
     <div id="score-list" class="score-list"></div>
   </section>

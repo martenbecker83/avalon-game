@@ -8,7 +8,7 @@ export const WORLDS = [
     id: 'jungle', name: 'Oerwoud', music: 'jungle',
     blurb: 'Lianen, slangen en wilde zwijnen',
     physics: { gravity: 1900, maxFall: 950 },
-    enemies: { normal: ['snake', 'parrot', 'frog'], hard: ['boar'] },
+    enemies: { normal: ['snake', 'parrot', 'frog', 'monkey', 'spider', 'beetle', 'chameleon', 'toucan', 'mosquito'], hard: ['boar', 'tiger'] },
     boss: {
       kind: 'gorilla', name: 'Koning Gorrilax', flying: false, proj: 'coconut',
       attacks: ['charge', 'slam', 'throw', 'rain', 'summon'],
@@ -24,7 +24,7 @@ export const WORLDS = [
     id: 'clouds', name: 'Paarse Wolken', music: 'clouds',
     blurb: 'Stuiterwolken en bliksemvleermuizen',
     physics: { gravity: 1750, maxFall: 850 },
-    enemies: { normal: ['cloudling', 'bat'], hard: ['stormtroll'] },
+    enemies: { normal: ['cloudling', 'bat', 'raindrop', 'ghost', 'owl', 'snowman', 'icicle', 'sheep', 'moth'], hard: ['stormtroll', 'yeti'] },
     boss: {
       kind: 'wizard', name: 'Tovenaar Donderbaard', flying: true, proj: 'bolt',
       attacks: ['shot', 'rain', 'teleport', 'summon', 'slam'],
@@ -40,7 +40,7 @@ export const WORLDS = [
     id: 'water', name: 'Onderwater', music: 'water',
     blurb: 'Zwemmen tussen krabben en kwallen',
     physics: { gravity: 1050, maxFall: 330, swim: true },
-    enemies: { normal: ['crab', 'jelly', 'fish'], hard: ['puffer'] },
+    enemies: { normal: ['crab', 'jelly', 'fish', 'shrimp', 'seahorse', 'eel', 'angler', 'starfish', 'urchin'], hard: ['puffer', 'shark'] },
     boss: {
       kind: 'octopus', name: 'Octavia de Octopus', flying: true, proj: 'ink',
       attacks: ['throw', 'charge', 'slam', 'shot', 'summon', 'rain'],
@@ -56,7 +56,7 @@ export const WORLDS = [
     id: 'sky', name: 'Lucht', music: 'sky',
     blurb: 'Zwevende eilanden, hier kun je dubbel springen',
     physics: { gravity: 1850, maxFall: 900, doubleJump: true },
-    enemies: { normal: ['wasp', 'crow'], hard: ['knight'] },
+    enemies: { normal: ['wasp', 'crow', 'seagull', 'dragonling', 'squirrel', 'gargoyle', 'balloon', 'goat'], hard: ['knight', 'archer', 'eagle'] },
     boss: {
       kind: 'dragon', name: 'Vuurdraak Skorch', flying: true, proj: 'fire',
       attacks: ['swoop', 'shot', 'rain', 'summon', 'charge'],
@@ -88,7 +88,55 @@ export const ENEMY_TYPES = {
   wasp:       { hp: 2, w: 34, h: 28, behavior: 'flyer', speed: 2.0, range: 100 },
   crow:       { hp: 2, w: 42, h: 30, behavior: 'flyer', speed: 1.2, range: 150 },
   knight:     { hp: 4, w: 40, h: 58, behavior: 'charger', speed: 60, charge: 300, hard: true },
+  // --- nieuw: oerwoud ---
+  monkey:     { hp: 2, w: 36, h: 38, behavior: 'hopper', speed: 170 },
+  spider:     { hp: 2, w: 36, h: 28, behavior: 'dropper', speed: 1 },
+  beetle:     { hp: 3, w: 44, h: 28, behavior: 'walker', speed: 45 },
+  chameleon:  { hp: 2, w: 46, h: 30, behavior: 'shooter', speed: 0, proj: 'seed' },
+  toucan:     { hp: 2, w: 42, h: 34, behavior: 'diver', speed: 1.2, range: 120 },
+  mosquito:   { hp: 1, w: 28, h: 24, behavior: 'flyer', speed: 2.6, range: 80 },
+  tiger:      { hp: 5, w: 66, h: 40, behavior: 'charger', speed: 80, charge: 400, hard: true },
+  // --- nieuw: paarse wolken ---
+  raindrop:   { hp: 1, w: 28, h: 34, behavior: 'hopper', speed: 150 },
+  ghost:      { hp: 2, w: 36, h: 40, behavior: 'floater', speed: 1.6, range: 70 },
+  owl:        { hp: 2, w: 40, h: 36, behavior: 'diver', speed: 1.0, range: 110 },
+  snowman:    { hp: 3, w: 38, h: 52, behavior: 'shooter', speed: 0, proj: 'snowball' },
+  icicle:     { hp: 1, w: 24, h: 40, behavior: 'dropper', speed: 1.4, nostomp: true },
+  sheep:      { hp: 2, w: 46, h: 34, behavior: 'walker', speed: 60 },
+  moth:       { hp: 1, w: 36, h: 28, behavior: 'flyer', speed: 1.6, range: 130 },
+  yeti:       { hp: 5, w: 52, h: 62, behavior: 'charger', speed: 55, charge: 330, hard: true },
+  // --- nieuw: onderwater ---
+  shrimp:     { hp: 1, w: 34, h: 24, behavior: 'hopper', speed: 160 },
+  seahorse:   { hp: 2, w: 28, h: 46, behavior: 'floater', speed: 1.1, range: 50 },
+  eel:        { hp: 2, w: 30, h: 56, behavior: 'popper', speed: 1 },
+  angler:     { hp: 2, w: 42, h: 34, behavior: 'flyer', speed: 0.8, range: 120 },
+  starfish:   { hp: 2, w: 40, h: 26, behavior: 'walker', speed: 80 },
+  urchin:     { hp: 2, w: 34, h: 30, behavior: 'walker', speed: 30, nostomp: true },
+  shark:      { hp: 5, w: 70, h: 36, behavior: 'diver', speed: 0.9, range: 160, hard: true },
+  // --- nieuw: lucht ---
+  seagull:    { hp: 2, w: 44, h: 30, behavior: 'diver', speed: 1.3, range: 140 },
+  dragonling: { hp: 2, w: 42, h: 34, behavior: 'flyer', speed: 1.5, range: 110 },
+  squirrel:   { hp: 2, w: 38, h: 34, behavior: 'hopper', speed: 190 },
+  gargoyle:   { hp: 3, w: 40, h: 42, behavior: 'walker', speed: 40 },
+  balloon:    { hp: 1, w: 34, h: 56, behavior: 'floater', speed: 0.9, range: 60 },
+  goat:       { hp: 3, w: 48, h: 40, behavior: 'charger', speed: 50, charge: 300 },
+  archer:     { hp: 4, w: 38, h: 56, behavior: 'shooter', speed: 0, proj: 'arrow', hard: true },
+  eagle:      { hp: 4, w: 58, h: 36, behavior: 'diver', speed: 1.1, range: 170, hard: true },
 };
+
+// gedrag: zweeft/vliegt (geen zwaartekracht) of loopt op de grond
+export const FLYING = ['flyer', 'floater', 'puffer', 'diver', 'dropper'];
+export const isFlying = (type) => FLYING.includes(ENEMY_TYPES[type].behavior);
+
+// Per level een andere mix van vijanden uit de wereld (zo zie je elk level weer nieuwe soorten)
+export function levelEnemies(world, level) {
+  const n = world.enemies.normal, h = world.enemies.hard;
+  const ground = n.filter((t) => !isFlying(t)), air = n.filter((t) => isFlying(t));
+  const rot = (arr, k, cnt) => Array.from({ length: Math.min(cnt, arr.length) }, (_, i) => arr[(k + i) % arr.length]);
+  const g = rot(ground, (level - 1) * 2, 3), a = rot(air, level - 1, 2);
+  const hard = level >= 4 ? h : rot(h, level - 1, 1 + (level >= 3 ? 1 : 0));
+  return { normal: [...g, ...a], hard };
+}
 
 // De gevangen mensen (altijd dezelfde groep, in elke wereld)
 export const PEOPLE = [
@@ -114,6 +162,7 @@ export function generateLevel(worldIdx, level) {
   const diff = (level - 1) / 4; // 0 .. 1
   const length = 7000 + level * 1500;
   const physics = world.physics;
+  const mix = levelEnemies(world, level);
   const jumpH = physics.swim ? 999 : physics.doubleJump ? 230 : 135; // safe vertical reach
   const maxGap = physics.swim ? 320 : physics.doubleJump ? 300 : 175;
 
@@ -131,15 +180,17 @@ export function generateLevel(worldIdx, level) {
   const addGround = (w, y = gy) => { grounds.push({ x, w, y }); const g = grounds[grounds.length - 1]; x += w; return g; };
   const enemyOn = (gx, gw, gyy, forceHard = false) => {
     const hard = forceHard || r() < 0.12 + diff * 0.28;
-    const list = hard ? world.enemies.hard : world.enemies.normal.filter((t) => !['parrot', 'bat', 'fish', 'wasp', 'crow', 'jelly'].includes(t));
-    const type = pick(list.length ? list : world.enemies.normal);
+    // grondvijanden; af en toe ook een vliegende/hangende vijand boven de grond
+    const list = hard ? mix.hard : (r() < 0.35 ? mix.normal : mix.normal.filter((t) => !isFlying(t)));
+    const type = pick(list.length ? list : mix.normal);
     const def = ENEMY_TYPES[type];
     const ex = gx + 60 + r() * Math.max(10, gw - 120);
-    const flying = ['flyer', 'floater', 'puffer'].includes(def.behavior);
-    enemies.push({ id: id++, type, x: ex, y: flying ? gyy - 90 - r() * 60 : gyy, range: Math.min(gw / 2 - 30, 160), hard: !!def.hard });
+    const flying = isFlying(type);
+    const fy = def.behavior === 'dropper' ? gyy - 210 : gyy - 90 - r() * 60;
+    enemies.push({ id: id++, type, x: ex, y: flying ? fy : gyy, range: Math.min(gw / 2 - 30, 160), hard: !!def.hard });
   };
   const flyerAt = (fx, fy) => {
-    const t = pick(world.enemies.normal.filter((t) => ['flyer', 'floater'].includes(ENEMY_TYPES[t].behavior)));
+    const t = pick(mix.normal.filter((t) => ['flyer', 'floater', 'diver'].includes(ENEMY_TYPES[t].behavior)));
     if (t) enemies.push({ id: id++, type: t, x: fx, y: fy, range: 120, hard: false });
   };
 
@@ -253,6 +304,18 @@ export function generateLevel(worldIdx, level) {
 
   // keep enemies out of start + checkpoints + arena
   const safe = enemies.filter((e) => e.x > 700 && e.x < arena.x - 150 && !checkpoints.some((c) => Math.abs(c.x - e.x) < 180));
+  // zorg dat elke soort uit de mix van dit level minstens één keer voorkomt
+  const groundY = (ex) => { const g = grounds.find((gg) => ex >= gg.x && ex <= gg.x + gg.w); return g ? g.y : null; };
+  for (const t of [...mix.normal, ...mix.hard]) {
+    if (safe.some((e) => e.type === t)) continue;
+    const counts = {}; safe.forEach((e) => { counts[e.type] = (counts[e.type] || 0) + 1; });
+    const cands = safe.filter((e) => counts[e.type] > 1 && groundY(e.x) !== null);
+    if (!cands.length) continue;
+    const e = cands[Math.floor(r() * cands.length)];
+    const gyy = groundY(e.x), def = ENEMY_TYPES[t];
+    e.type = t; e.hard = !!def.hard;
+    e.y = isFlying(t) ? (def.behavior === 'dropper' ? gyy - 210 : gyy - 110) : gyy;
+  }
 
   return { world, worldIdx, level, length: x, grounds, plats, enemies: safe, tokens, hearts, checkpoints, arena, deco, isFinal: level === LEVELS_PER_WORLD };
 }
