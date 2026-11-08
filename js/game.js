@@ -423,10 +423,20 @@ export class Game {
         this.projectiles.push({ type: 'pancake', x: mx, y: my, vx: p.dir * 560, vy: this.aimVy(p, mx, my, 560, 0, 0) * 0.8, g: 0, life: 1.6, age: 0, dmg: a.dmg, rot: 0, spin: 18, w: 34, h: 18, hit: new Set(), boomerang: true, dir: p.dir, back: false, pierce: true, owner: p });
         break;
       case 'chalk': {
-        // Avalon gooit bordkrijtjes: snel en recht, met een klein boogje
+        // Avalon gooit bordkrijtjes recht op de dichtstbijzijnde vijand af (eerst vooruit kijken, anders even omdraaien)
         p.atkT = p.atkDur = 0.22; sfx.chalk();
         const color = CHALK_COLORS[Math.floor(Math.random() * CHALK_COLORS.length)];
-        this.projectiles.push({ type: 'chalk', x: mx, y: my - 6, vx: p.dir * 640 + p.vx * 0.3, vy: this.aimVy(p, mx, my - 6, 640, 320, -70), g: 320, life: 0.6, age: 0, dmg: a.dmg, rot: 0, spin: p.dir * 20, w: 22, h: 16, hit: new Set(), color, owner: p });
+        const sx = p.x + p.dir * 12, sy = p.y - p.h * 0.62 - 6;
+        const tgt = this.chalkTarget(p, sx, sy);
+        const speed = 700;
+        let vx = p.dir * speed, vy = -40;
+        if (tgt) {
+          const b = this.boxOf(tgt), tx = (b.l + b.r) / 2, ty = b.t + (b.b - b.t) * 0.45;
+          if (Math.sign(tx - p.x) !== p.dir) p.dir = Math.sign(tx - p.x) || p.dir;
+          const d = Math.hypot(tx - sx, ty - sy) || 1;
+          vx = (tx - sx) / d * speed; vy = (ty - sy) / d * speed;
+        }
+        this.projectiles.push({ type: 'chalk', x: sx, y: sy, vx, vy, g: 0, life: 0.85, age: 0, dmg: a.dmg, rot: Math.atan2(vy, vx), spin: 0, w: 22, h: 16, hit: new Set(), color, owner: p, target: tgt, homing: true });
         break;
       }
       case 'rice': {
@@ -485,6 +495,21 @@ export class Game {
     return clamp(best.dy / t - 0.5 * g * t, -700, 400);
   }
 
+  // doel voor een krijtje: de dichtstbijzijnde vijand voor je; staat er niemand voor je, dan eentje vlak achter je
+  chalkTarget(p, sx, sy) {
+    let best = null, bd = Infinity;
+    for (const e of this.targets()) {
+      const b = this.boxOf(e); const ex = (b.l + b.r) / 2, ey = (b.t + b.b) / 2;
+      const dx = ex - sx, dy = ey - sy;
+      const ahead = Math.sign(dx) === p.dir || Math.abs(dx) < 20;
+      const dist = Math.hypot(dx, dy * 1.2);
+      if (dist > (ahead ? 650 : 420)) continue;
+      const score = dist + (ahead ? 0 : 200);
+      if (score < bd) { bd = score; best = e; }
+    }
+    return best;
+  }
+
   targets() {
     const list = this.enemies.filter((e) => !e.dead && !(e.pop !== undefined && e.pop < 0.4));
     if (this.boss && !this.boss.dead && this.boss.state !== 'intro' && !(this.boss.fade !== undefined && this.boss.fade < 0.5)) list.push(this.boss);
@@ -536,6 +561,14 @@ export class Game {
           const sp = Math.hypot(q.vx, q.vy); if (sp > 720) { q.vx *= 720 / sp; q.vy *= 720 / sp; }
           if (dist < 30) q.dead = true;
         }
+      }
+      if (q.homing && q.target && !q.target.dead) {
+        // krijtje stuurt een beetje bij, zodat het een bewegende vijand toch raakt
+        const b = this.boxOf(q.target), tx = (b.l + b.r) / 2, ty = b.t + (b.b - b.t) * 0.45;
+        const d = Math.hypot(tx - q.x, ty - q.y) || 1, sp = Math.hypot(q.vx, q.vy);
+        const k = Math.min(1, dt * 10);
+        q.vx += ((tx - q.x) / d * sp - q.vx) * k; q.vy += ((ty - q.y) / d * sp - q.vy) * k;
+        q.rot = Math.atan2(q.vy, q.vx);
       }
       q.vy += (q.g || 0) * dt;
       q.x += q.vx * dt; q.y += q.vy * dt;

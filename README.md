@@ -8,7 +8,7 @@ Speel alleen of met z'n tweeën. Kies een van de acht personages, elk met een ei
 
 | Personage | Wapen | Superkracht |
 |---|---|---|
-| Avalon | Bordkrijtjes | Supersnel, gooit krijtjes. Speciale knop: strikje op de dichtstbijzijnde vijand, die is dan even poeslief en ongevaarlijk |
+| Avalon | Bordkrijtjes | Supersnel, gooit krijtjes die vanzelf op de dichtstbijzijnde vijand afgaan. Speciale knop: strikje op de dichtstbijzijnde vijand, die is dan even poeslief en ongevaarlijk |
 | Fu-Chi | Klauwen + haarbal | Supersnel krabben, springt het hoogst. Speciale knop: haarbal spugen |
 | Papa | Bierflesjes | Veelzijdig: gooit ver in een boogje, schuim raakt vijanden in de buurt |
 | Mama | Microfoon | Veelzijdig: schreeuwgolf die door alle vijanden heen gaat |
