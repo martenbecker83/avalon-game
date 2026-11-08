@@ -570,6 +570,11 @@ export class Game {
     return best;
   }
 
+  // staat deze vijand helemaal in beeld (met een randje marge)?
+  inView(e, margin = 0) {
+    const b = this.boxOf(e), c = this.cam;
+    return b.l > c.x + margin && b.r < c.x + this.viewW - margin && b.b > c.y + margin && b.t < c.y + this.viewH - margin;
+  }
   targets() {
     const list = this.enemies.filter((e) => !e.dead && !(e.pop !== undefined && e.pop < 0.4));
     if (this.boss && !this.boss.dead && this.boss.state !== 'intro' && !(this.boss.fade !== undefined && this.boss.fade < 0.5)) list.push(this.boss);
@@ -780,8 +785,11 @@ export class Game {
           break;
         }
         case 'shooter': {
-          e.dir = Math.sign(dxp) || e.dir; e.vx = 0; e.cool -= dt; e.aim = Math.max(0, e.aim - dt);
-          if (e.cool <= 0 && Math.abs(dxp) < 560) {
+          e.dir = Math.sign(dxp) || e.dir; e.vx = 0; e.aim = Math.max(0, e.aim - dt);
+          // pas schieten als je de vijand al even kunt zien (helemaal in beeld)
+          e.seen = this.inView(e, 30) ? (e.seen || 0) + dt : 0;
+          if (e.seen > 0.2) e.cool -= dt;
+          if (e.cool <= 0 && e.seen > 0.8 && Math.abs(dxp) < 560) {
             e.cool = 2.4 - (this.level - 1) * 0.2; e.aim = 0.4;
             const flat = d.proj === 'arrow' || d.proj === 'seed';
             const tt = flat ? 0.7 : 0.9; const g = flat ? 300 : 900;
